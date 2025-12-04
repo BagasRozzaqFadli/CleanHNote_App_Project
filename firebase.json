@@ -1,0 +1,29 @@
+{
+    "firestore": {
+        "rules": "firestore.rules",
+        "indexes": "firestore.indexes.json"
+    },
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "cleanhnote-hironing",
+                    "appId": "1:416175714950:android:7a00e808e03d86b1a7d707",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "cleanhnote-hironing",
+                    "configurations": {
+                        "android": "1:416175714950:android:7a00e808e03d86b1a7d707",
+                        "ios": "1:416175714950:ios:c7f4c03d59521c75a7d707",
+                        "macos": "1:416175714950:ios:c7f4c03d59521c75a7d707",
+                        "web": "1:416175714950:web:a949b98796974831a7d707",
+                        "windows": "1:416175714950:web:f21db7f15281107ca7d707"
+                    }
+                }
+            }
+        }
+    }
+}

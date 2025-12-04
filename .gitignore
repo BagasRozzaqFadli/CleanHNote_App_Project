@@ -1,0 +1,102 @@
+# -----------------------
+# MISCELLANEOUS
+# -----------------------
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+
+# -----------------------
+# FLUTTER / DART / PUB
+# -----------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+doc/api/
+
+# -----------------------
+# ANDROID
+# -----------------------
+# Folder Build & Cache (Sampah)
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+android/.kotlin/
+
+# Konfigurasi Lokal (Jangan di-upload demi keamanan)
+local.properties
+key.properties
+android/key.properties
+
+# File Keystore (SANGAT RAHASIA - Jangan di-upload)
+*.keystore
+*.jks
+
+# Google Services (Opsional: Jika public repo, ignore ini. Jika private, boleh dibuka)
+android/app/google-services.json
+
+# -----------------------
+# IOS
+# -----------------------
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral
+ios/.symlinks
+ios/Pods/
+ios/build/
+
+# Google Services iOS
+ios/firebase_app_id_file.json
+ios/GoogleService-Info.plist
+
+# -----------------------
+# WINDOWS
+# -----------------------
+windows/flutter/ephemeral/
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# -----------------------
+# LINUX
+# -----------------------
+linux/flutter/ephemeral/
+linux/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugin_registrant.h
+linux/flutter/generated_plugins.cmake
+
+# -----------------------
+# MACOS
+# -----------------------
+macos/Flutter/ephemeral/
+macos/Flutter/generated_plugin_registrant.swift
+macos/Flutter/generated_plugins.cmake
+macos/Pods/
+
+# -----------------------
+# IDE & TOOLS
+# -----------------------
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# -----------------------
+# BUILD ARTIFACTS (APK/AAB)
+# -----------------------
+*.apk
+*.aab
+*.apks

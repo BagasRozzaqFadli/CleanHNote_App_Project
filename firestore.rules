@@ -1,0 +1,166 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========================================
+    // HELPER FUNCTIONS
+    // ========================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is accessing their own document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Get user document to check role
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+    
+    // Check if user has premium role
+    function isPremiumUser() {
+      return isAuthenticated() && getUserData(request.auth.uid).role == 'premium';
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && getUserData(request.auth.uid).role == 'admin';
+    }
+    
+    // Check if user is trying to change their own role
+    function isRoleChangeAttempt() {
+      return request.resource.data.role != resource.data.role;
+    }
+    
+    // ========================================
+    // A. USER DATA COLLECTION
+    // ========================================
+    
+    match /users/{userId} {
+      // Read: Allow if user owns the document OR admin OR when querying
+      allow read: if isOwner(userId) || 
+                     isAdmin() ||
+                     (isAuthenticated() && request.query != null);
+      
+      // Create: Allow if creating own document
+      allow create: if isOwner(userId);
+      
+      // Update: Allow if user owns document AND not trying to escalate to admin
+      allow update: if isOwner(userId) && 
+                       !isRoleChangeAttempt() && 
+                       !(request.resource.data.role == 'admin' && resource.data.role != 'admin') &&
+                       // Enforce team limits: Free (3), Premium (15)
+                       (
+                         !request.resource.data.keys().hasAny(['joinedTeamIds']) ||
+                         request.resource.data.joinedTeamIds.size() <= (resource.data.role == 'premium' ? 15 : 3)
+                       );
+      
+      // Delete: Allow if user owns document
+      
+      // Delete: Allow if task belongs to authenticated user
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    
+    // ========================================
+    // B. PERSONAL TASKS COLLECTION
+    // ========================================
+    
+    match /personal_tasks/{taskId} {
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ========================================
+    // C. TEAMS COLLECTION
+    // ========================================
+    
+    match /teams/{teamId} {
+      // Read: Allow authenticated users to query (for invite code check & join)
+      // Or if user is owner/member of specific team
+      allow read: if isAuthenticated();
+      
+      // Create: Allow if user has premium OR admin role
+      allow create: if isPremiumUser() || isAdmin();
+      
+      // Update: Allow ONLY if user is the team owner
+      // Update: Allow if owner OR if user is joining/leaving
+      allow update: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        (
+          // Ensure only memberIds field is being changed
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds']) &&
+          (
+            // Logic for Joining: New list must contain auth.uid and be larger
+            (request.resource.data.memberIds.hasAll(resource.data.memberIds) && 
+             request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1 &&
+             request.resource.data.memberIds[request.resource.data.memberIds.size() - 1] == request.auth.uid) ||
+             
+            // Logic for Leaving: Old list must contain auth.uid and be larger
+            (resource.data.memberIds.hasAll(request.resource.data.memberIds) && 
+             resource.data.memberIds.size() == request.resource.data.memberIds.size() + 1)
+          )
+        )
+      );
+      
+      // Delete: Allow ONLY if user is the team owner
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      
+    }
+    
+    // ========================================
+    // D. TEAM ASSIGNMENTS (TOP-LEVEL COLLECTION)
+    // ========================================
+    
+    match /team_assignments/{taskId} {
+      // Helper function to get team owner by teamId field
+      function getTeamOwnerIdByField() {
+        return get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.ownerId;
+      }
+      
+      // Check if user is the team owner
+      function isTeamOwner() {
+        return isAuthenticated() && request.auth.uid == getTeamOwnerIdByField();
+      }
+      
+      // Check if user is assigned to this task
+      function isAssignedMember() {
+        return isAuthenticated() && resource.data.assignedToUid == request.auth.uid;
+      }
+      
+      // Check if update only modifies allowed fields for members
+      function isMemberAllowedUpdate() {
+        // Ensure title and description are not changed
+        return (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['title', 'description']));
+      }
+      
+      // Read: Allow if user is team owner OR assigned member
+      allow read: if isTeamOwner() || isAssignedMember();
+      
+      // Create: Allow ONLY if user is team owner (verify via teamId)
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == get(/databases/$(database)/documents/teams/$(request.resource.data.teamId)).data.ownerId;
+      
+      // Update: Team owner can update all, assigned members can only update specific fields
+      allow update: if isTeamOwner() || 
+                       (isAssignedMember() && isMemberAllowedUpdate());
+      
+      // Delete: Allow ONLY team owner
+      allow delete: if isTeamOwner();
+    }
+
+    // ========================================
+    // E. NOTIFICATIONS COLLECTION
+    // ========================================
+
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid; // Or allow system/cloud functions to create? For now assume client creates or user-scoped.
+    }
+  }
+}
