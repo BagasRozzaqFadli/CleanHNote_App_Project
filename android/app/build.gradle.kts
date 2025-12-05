@@ -14,6 +14,10 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // --- PERUBAHAN 1: Aktifkan Desugaring ---
+        isCoreLibraryDesugaringEnabled = true
+        // ----------------------------------------
+        
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -28,14 +32,12 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         
-        // --- BAGIAN INI YANG DIUBAH ---
-        minSdk = flutter.minSdkVersion  // Ubah dari flutter.minSdkVersion menjadi 23
+        minSdk = flutter.minSdkVersion 
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode.toInt()
         versionName = flutter.versionName
         
-        multiDexEnabled = true // Tambahkan baris ini agar aplikasi kuat menampung Firebase
-        // ------------------------------
+        multiDexEnabled = true 
     }
 
     buildTypes {
@@ -50,3 +52,9 @@ android {
 flutter {
     source = "../.."
 }
+
+// --- PERUBAHAN 2: Tambahkan Dependency Desugar ---
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+}
+// -------------------------------------------------

@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../providers/task_provider.dart';
 import '../models/task_model.dart';
+import '../models/user_model.dart';
 import 'create_task_screen.dart';
 import '../services/notification_service.dart';
+import '../services/notification_scheduler.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/my_teams_screen.dart';
+import '../screens/profile_screen.dart';
+import '../widgets/local_time_widget.dart';
+import 'personal_task_detail_screen.dart';
 
 /// Premium Plan Dashboard - Unlimited tasks with team features
 class PremiumDashboardScreen extends StatefulWidget {
   const PremiumDashboardScreen({super.key});
-
   @override
   State<PremiumDashboardScreen> createState() => _PremiumDashboardScreenState();
 }
@@ -31,7 +36,6 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
     if (user != null) {
       final taskProvider = context.read<TaskProvider>();
       await taskProvider.initialize(user.uid);
-
       if (taskProvider.maintenanceResult != null && mounted) {
         final result = taskProvider.maintenanceResult!;
         if (result.deletedTasks > 0 || result.prunedImages > 0) {
@@ -55,7 +59,6 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
     if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -148,13 +151,10 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-
             final tasks = snapshot.data ?? [];
-
             if (tasks.isEmpty) {
               return _buildEmptyState(context);
             }
-
             return ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: tasks.length,
@@ -182,29 +182,75 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          UserAccountsDrawerHeader(
-            accountName: Row(
-              children: [
-                const Text('Premium Plan'),
-                const SizedBox(width: 8),
-                Icon(Icons.star, color: Colors.amber[300], size: 20),
-              ],
-            ),
-            accountEmail: Text(email ?? ''),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                (email ?? 'U')[0].toUpperCase(),
-                style: TextStyle(fontSize: 40.0, color: Colors.indigo[700]),
-              ),
-            ),
-            decoration: BoxDecoration(color: Colors.indigo[700]),
+          // Username in Drawer Header with StreamBuilder
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(context.read<AuthService>().currentUser?.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              String displayName = email ?? '';
+              if (snapshot.hasData && snapshot.data != null) {
+                final userModel = UserModel.fromFirestore(snapshot.data!);
+                displayName = userModel.username;
+              }
+              return UserAccountsDrawerHeader(
+                accountName: Row(
+                  children: [
+                    Text(displayName),
+                    const SizedBox(width: 8),
+                    Icon(Icons.star, color: Colors.amber[300], size: 20),
+                  ],
+                ),
+                accountEmail: Text(email ?? ''),
+                currentAccountPicture: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileScreen(),
+                      ),
+                    );
+                  },
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      displayName.isNotEmpty
+                          ? displayName[0].toUpperCase()
+                          : 'U',
+                      style: TextStyle(
+                        fontSize: 40.0,
+                        color: Colors.indigo[700],
+                      ),
+                    ),
+                  ),
+                ),
+                decoration: BoxDecoration(color: Colors.indigo[700]),
+              );
+            },
           ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: const LocalTimeWidget(),
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.dashboard),
             title: const Text('Personal Tasks'),
             selected: true,
             onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.person),
+            title: const Text('My Profile'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.group),
@@ -218,11 +264,50 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
             },
           ),
           const Divider(),
+          // Test Notifications Button
+          ListTile(
+            leading: const Icon(Icons.notifications_active),
+            title: const Text('Check Notifications'),
+            onTap: () async {
+              Navigator.pop(context);
+              await NotificationScheduler.sendTestNotification();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Test notification sent!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
             onTap: () async {
-              await context.read<AuthService>().signOut();
+              // Show confirmation dialog
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('No'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Yes'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (shouldLogout == true && context.mounted) {
+                await context.read<AuthService>().signOut();
+              }
             },
           ),
         ],
@@ -235,18 +320,22 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.task_alt, size: 80, color: Colors.grey[400]),
+          Icon(Icons.task_alt, size: 100, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No tasks yet',
-            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+            'No tasks yet!',
+            style: TextStyle(fontSize: 24, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           ElevatedButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CreateTaskScreen()),
-            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreateTaskScreen(),
+                ),
+              );
+            },
             child: const Text('Create Your First Task'),
           ),
         ],
@@ -255,30 +344,40 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
   }
 
   Widget _buildTaskCard(BuildContext context, TaskModel task, String uid) {
-    final isOverdue = task.isOverdue;
-
+    final isOverdue =
+        task.dueDateTime != null &&
+        task.dueDateTime!.isBefore(DateTime.now()) &&
+        !task.isCompleted;
+    final backgroundColor = task.isCompleted
+        ? Colors.green[50]
+        : isOverdue
+        ? Colors.red[50]
+        : Colors.white;
     return Card(
-      elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PersonalTaskDetailScreen(task: task),
+            ),
+          );
+        },
         leading: CircleAvatar(
           backgroundColor: task.isCompleted
-              ? Colors.green[100]
+              ? Colors.green
               : isOverdue
-              ? Colors.red[100]
-              : Colors.indigo[100],
+              ? Colors.red
+              : Colors.blue,
           child: Icon(
             task.isCompleted
-                ? Icons.check
+                ? Icons.check_circle
                 : isOverdue
                 ? Icons.warning
-                : Icons.work,
-            color: task.isCompleted
-                ? Colors.green
-                : isOverdue
-                ? Colors.red
-                : Colors.indigo,
+                : Icons.task_alt,
+            color: Colors.white,
           ),
         ),
         title: Text(
@@ -300,63 +399,46 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
             const SizedBox(height: 4),
             Row(
               children: [
-                _buildTag(
-                  task.level ?? 'Easy',
-                  Colors.purple[100]!,
-                  Colors.purple[800]!,
-                ),
-                const SizedBox(width: 8),
-                _buildTag(
-                  task.priority ?? 'Medium',
-                  Colors.orange[100]!,
-                  Colors.orange[800]!,
-                ),
-                const SizedBox(width: 8),
-                if (task.dueDate != null)
+                if (task.dueDateTime != null) ...[
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
                   Text(
-                    DateFormat('MMM d').format(task.dueDate!),
+                    DateFormat('MMM dd, HH:mm').format(task.dueDateTime!),
                     style: TextStyle(
-                      color: isOverdue ? Colors.red : Colors.grey[600],
+                      color: isOverdue ? Colors.red : Colors.grey[700],
                       fontWeight: isOverdue
                           ? FontWeight.bold
                           : FontWeight.normal,
                     ),
                   ),
+                ],
               ],
             ),
           ],
         ),
-        trailing: PopupMenuButton(
-          itemBuilder: (context) => [
-            if (!task.isCompleted)
-              const PopupMenuItem(
-                value: 'complete',
-                child: Text('Mark Complete'),
-              ),
-            const PopupMenuItem(value: 'delete', child: Text('Delete')),
-          ],
+        tileColor: backgroundColor,
+        trailing: PopupMenuButton<String>(
           onSelected: (value) async {
-            if (value == 'complete') {
-              await context.read<TaskProvider>().completeTask(task.id, uid);
-            } else if (value == 'delete') {
+            if (value == 'delete') {
               await context.read<TaskProvider>().deleteTask(task.id, uid);
+            } else if (value == 'toggle') {
+              // Toggle completion status
+              await context.read<TaskProvider>().updateTask(task.id, {
+                'isCompleted': !task.isCompleted,
+                if (!task.isCompleted) 'completedAt': DateTime.now(),
+              }, uid);
             }
           },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'toggle',
+              child: Text(
+                task.isCompleted ? 'Mark Incomplete' : 'Mark Complete',
+              ),
+            ),
+            const PopupMenuItem(value: 'delete', child: Text('Delete')),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTag(String text, Color bg, Color fg) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 10, color: fg, fontWeight: FontWeight.bold),
       ),
     );
   }

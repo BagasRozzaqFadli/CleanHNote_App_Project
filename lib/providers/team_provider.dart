@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/team_model.dart';
 import '../models/team_assignment_model.dart';
 import '../models/user_model.dart';
@@ -111,6 +112,25 @@ class TeamProvider with ChangeNotifier {
     }
   }
 
+  /// Update team assignment (owner only)
+  Future<void> updateTeamAssignment(
+    String assignmentId,
+    Map<String, dynamic> updates,
+  ) async {
+    await FirebaseFirestore.instance
+        .collection('team_assignments')
+        .doc(assignmentId)
+        .update(updates);
+  }
+
+  /// Delete team assignment (owner only)
+  Future<void> deleteTeamAssignment(String assignmentId) async {
+    await FirebaseFirestore.instance
+        .collection('team_assignments')
+        .doc(assignmentId)
+        .delete();
+  }
+
   /// Submit proof of work
   Future<void> submitProof(
     String assignmentId,
@@ -139,6 +159,23 @@ class TeamProvider with ChangeNotifier {
   /// Get all team assignments (owner dashboard)
   Stream<List<TeamAssignmentModel>> getAllAssignments(String teamId) {
     return _dbService.getAllTeamAssignments(teamId);
+  }
+
+  /// Update assignment status
+  Future<void> updateAssignmentStatus(
+    String teamId,
+    String assignmentId,
+    String newStatus,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('team_assignments')
+          .doc(assignmentId)
+          .update({'status': newStatus});
+      notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // ============================================================================

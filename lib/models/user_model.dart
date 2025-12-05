@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class UserModel {
   final String uid;
   final String email;
+  final String username; // Display name, editable by user
   final String role; // 'free', 'premium', or 'admin'
   final String tenantId; // 6-character alphanumeric for admin search
   final List<String> joinedTeamIds; // IDs of teams user has joined
@@ -12,6 +13,7 @@ class UserModel {
   UserModel({
     required this.uid,
     required this.email,
+    required this.username,
     required this.role,
     required this.tenantId,
     this.joinedTeamIds = const [],
@@ -21,9 +23,11 @@ class UserModel {
   /// Convert from Firestore document
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final email = data['email'] ?? '';
     return UserModel(
       uid: doc.id,
-      email: data['email'] ?? '',
+      email: email,
+      username: data['username'] ?? _generateUsernameFromEmail(email),
       role: data['role'] ?? 'free',
       tenantId: data['tenantId'] ?? '',
       joinedTeamIds: List<String>.from(data['joinedTeamIds'] ?? []),
@@ -31,10 +35,18 @@ class UserModel {
     );
   }
 
+  /// Generate username from email (part before @)
+  static String _generateUsernameFromEmail(String email) {
+    if (email.isEmpty) return 'User';
+    final parts = email.split('@');
+    return parts.isNotEmpty ? parts[0] : 'User';
+  }
+
   /// Convert to Firestore document
   Map<String, dynamic> toFirestore() {
     return {
       'email': email,
+      'username': username,
       'role': role,
       'tenantId': tenantId,
       'joinedTeamIds': joinedTeamIds,
@@ -70,6 +82,7 @@ class UserModel {
   UserModel copyWith({
     String? uid,
     String? email,
+    String? username,
     String? role,
     String? tenantId,
     List<String>? joinedTeamIds,
@@ -78,6 +91,7 @@ class UserModel {
     return UserModel(
       uid: uid ?? this.uid,
       email: email ?? this.email,
+      username: username ?? this.username,
       role: role ?? this.role,
       tenantId: tenantId ?? this.tenantId,
       joinedTeamIds: joinedTeamIds ?? this.joinedTeamIds,

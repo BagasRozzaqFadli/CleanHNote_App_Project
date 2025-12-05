@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 /// Team assignment model for tasks assigned by team owner
 class TeamAssignmentModel {
@@ -9,6 +10,8 @@ class TeamAssignmentModel {
   final String title;
   final String? description;
   final String? level; // 'Easy' or 'Hard'
+  final DateTime? dueDate; // Due date for the task
+  final TimeOfDay? dueTime; // Due time for the task
   final String? category;
   final String? priority; // 'Low', 'Medium', 'High'
   final String status; // 'pending', 'in_progress', 'done'
@@ -25,6 +28,8 @@ class TeamAssignmentModel {
     required this.title,
     this.description,
     this.level,
+    this.dueDate,
+    this.dueTime,
     this.category,
     this.priority,
     this.status = 'pending',
@@ -37,6 +42,19 @@ class TeamAssignmentModel {
   /// Convert from Firestore document
   factory TeamAssignmentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    // Parse dueTime from string (HH:mm format)
+    TimeOfDay? parsedTime;
+    if (data['dueTime'] != null) {
+      final parts = data['dueTime'].toString().split(':');
+      if (parts.length == 2) {
+        parsedTime = TimeOfDay(
+          hour: int.parse(parts[0]),
+          minute: int.parse(parts[1]),
+        );
+      }
+    }
+
     return TeamAssignmentModel(
       id: doc.id,
       teamId: data['teamId'] ?? '',
@@ -45,6 +63,8 @@ class TeamAssignmentModel {
       title: data['title'] ?? '',
       description: data['description'],
       level: data['level'],
+      dueDate: (data['dueDate'] as Timestamp?)?.toDate(),
+      dueTime: parsedTime,
       category: data['category'],
       priority: data['priority'],
       status: data['status'] ?? 'pending',
@@ -57,6 +77,13 @@ class TeamAssignmentModel {
 
   /// Convert to Firestore document
   Map<String, dynamic> toFirestore() {
+    // Convert TimeOfDay to string format (HH:mm)
+    String? timeString;
+    if (dueTime != null) {
+      timeString =
+          '${dueTime!.hour.toString().padLeft(2, '0')}:${dueTime!.minute.toString().padLeft(2, '0')}';
+    }
+
     return {
       'teamId': teamId,
       'assignedToUid': assignedToUid,
@@ -64,6 +91,8 @@ class TeamAssignmentModel {
       'title': title,
       'description': description,
       'level': level,
+      'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
+      'dueTime': timeString,
       'category': category,
       'priority': priority,
       'status': status,
@@ -76,18 +105,85 @@ class TeamAssignmentModel {
     };
   }
 
+  /// Get combined date and time as DateTime
+  DateTime? get dueDateTime {
+    if (dueDate == null) return null;
+    if (dueTime == null) return dueDate;
+
+    return DateTime(
+      dueDate!.year,
+      dueDate!.month,
+      dueDate!.day,
+      dueTime!.hour,
+      dueTime!.minute,
+    );
+  }
+
   /// Check if photos should be pruned (done for 7+ days)
   bool get shouldPrunePhotos {
     if (status != 'done' || completedAt == null) return false;
     return DateTime.now().difference(completedAt!).inDays > 7;
   }
 
-  /// Check if task should be deleted (done/overdue for 30+ days)
+  /// Check if task should be deleted (completed OR overdue for 10+ days)
   bool get shouldBeDeleted {
-    if (completedAt != null && status == 'done') {
-      return DateTime.now().difference(completedAt!).inDays > 30;
+    final now = DateTime.now();
+
+    // Delete if task is COMPLETED for 10+ days
+    if (status == 'done' && completedAt != null) {
+      return now.difference(completedAt!).inDays > 10;
     }
+
+    // OR delete if task is OVERDUE (not completed) for 10+ days
+    if (status != 'done' && dueDateTime != null) {
+      if (now.isAfter(dueDateTime!)) {
+        return now.difference(dueDateTime!).inDays > 10;
+      }
+    }
+
     return false;
+  }
+
+  /// Get time remaining until auto-deletion
+  /// Shows for COMPLETED tasks OR OVERDUE tasks
+  Duration? get timeUntilDeletion {
+    final now = DateTime.now();
+
+    // Show countdown if task is COMPLETED (10 days from completion)
+    if (status == 'done' && completedAt != null) {
+      final deletionDate = completedAt!.add(const Duration(days: 10));
+      final remaining = deletionDate.difference(now);
+      if (!remaining.isNegative) return remaining;
+    }
+
+    // OR show countdown if task is OVERDUE and not completed (10 days from due date)
+    if (status != 'done' && dueDateTime != null) {
+      if (now.isAfter(dueDateTime!)) {
+        final deletionDate = dueDateTime!.add(const Duration(days: 10));
+        final remaining = deletionDate.difference(now);
+        if (!remaining.isNegative) return remaining;
+      }
+    }
+
+    return null;
+  }
+
+  /// Get human-readable countdown text
+  String get deletionCountdownText {
+    final duration = timeUntilDeletion;
+    if (duration == null) return '';
+
+    final days = duration.inDays;
+    if (days > 0) {
+      return 'Auto-delete in $days day${days == 1 ? '' : 's'}';
+    }
+
+    final hours = duration.inHours;
+    if (hours > 0) {
+      return 'Auto-delete in $hours hour${hours == 1 ? '' : 's'}';
+    }
+
+    return 'Auto-delete soon';
   }
 
   /// Check if task is completed
@@ -105,6 +201,8 @@ class TeamAssignmentModel {
     String? title,
     String? description,
     String? level,
+    DateTime? dueDate,
+    TimeOfDay? dueTime,
     String? category,
     String? priority,
     String? status,
@@ -121,6 +219,8 @@ class TeamAssignmentModel {
       title: title ?? this.title,
       description: description ?? this.description,
       level: level ?? this.level,
+      dueDate: dueDate ?? this.dueDate,
+      dueTime: dueTime ?? this.dueTime,
       category: category ?? this.category,
       priority: priority ?? this.priority,
       status: status ?? this.status,

@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../models/task_model.dart';
 import '../models/team_model.dart';
 import '../models/team_assignment_model.dart';
+import 'notification_service.dart';
 
 /// Result of auto-maintenance operation
 class MaintenanceResult {
@@ -422,6 +423,14 @@ class DatabaseService {
       await _firestore
           .collection('team_assignments')
           .add(assignment.toFirestore());
+
+      // Send notification to assignee
+      final notificationService = NotificationService();
+      await notificationService.notifyTaskAssigned(
+        assignedToUid,
+        assignment.title,
+        team.name,
+      );
     } catch (e) {
       rethrow;
     }

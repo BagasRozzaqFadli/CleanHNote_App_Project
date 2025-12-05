@@ -10,6 +10,9 @@ import '../providers/team_provider.dart';
 import '../services/auth_service.dart';
 import '../services/image_helper.dart';
 
+import 'create_team_task_screen.dart';
+import '../widgets/assignment_card_widget.dart';
+
 class TeamDashboardScreen extends StatefulWidget {
   final String teamId;
 
@@ -183,7 +186,12 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: ElevatedButton.icon(
-                  onPressed: () => _showAssignTaskDialog(team),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CreateTeamTaskScreen(team: team),
+                    ),
+                  ),
                   icon: const Icon(Icons.add),
                   label: const Text('Assign New Task'),
                 ),
@@ -196,89 +204,11 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
                   itemCount: teamAssignments.length,
                   itemBuilder: (context, index) {
                     final task = teamAssignments[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      child: ExpansionTile(
-                        title: Text(
-                          task.title,
-                          style: TextStyle(
-                            decoration: task.isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                        ),
-                        subtitle: Text('Status: ${task.status}'),
-                        trailing: task.isCompleted
-                            ? const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              )
-                            : const Icon(Icons.pending, color: Colors.orange),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (task.description != null)
-                                  Text('Description: ${task.description}'),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Priority: ${task.priority} | Level: ${task.level}',
-                                ),
-                                const SizedBox(height: 16),
-                                if (task.isCompleted) ...[
-                                  const Text(
-                                    'Proof of Work:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      if (task.photoBeforeBase64 != null)
-                                        Expanded(
-                                          child: Column(
-                                            children: [
-                                              const Text('Before'),
-                                              _buildProofImage(
-                                                task.photoBeforeBase64!,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      if (task.photoAfterBase64 != null)
-                                        Expanded(
-                                          child: Column(
-                                            children: [
-                                              const Text('After'),
-                                              _buildProofImage(
-                                                task.photoAfterBase64!,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ] else if (!isOwner &&
-                                    task.assignedToUid == uid) ...[
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        _showSubmitProofDialog(task),
-                                    child: const Text(
-                                      'Submit Proof (Complete Task)',
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                    return AssignmentCard(
+                      task: task,
+                      isOwner: isOwner,
+                      currentUid: uid,
+                      onSubmitProof: _showSubmitProofDialog,
                     );
                   },
                 ),
@@ -452,123 +382,6 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
     );
   }
 
-  void _showAssignTaskDialog(TeamModel team) {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    String? selectedMemberId;
-    String level = 'Easy';
-    String priority = 'Medium';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Assign Task'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                ),
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: level,
-                  items: ['Easy', 'Hard']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) => level = v!,
-                  decoration: const InputDecoration(labelText: 'Level'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: priority,
-                  items: ['Low', 'Medium', 'High']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) => priority = v!,
-                  decoration: const InputDecoration(labelText: 'Priority'),
-                ),
-                const SizedBox(height: 16),
-                const Text('Assign To:'),
-                SizedBox(
-                  height: 100,
-                  width: double.maxFinite,
-                  child: ListView.builder(
-                    itemCount: team.memberIds.length,
-                    itemBuilder: (context, index) {
-                      final memberId = team.memberIds[index];
-                      // Allow assigning to self or others
-                      return FutureBuilder<UserModel?>(
-                        future: context.read<TeamProvider>().getUser(memberId),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const SizedBox.shrink();
-                          final member = snapshot.data!;
-                          return RadioListTile<String>(
-                            title: Text(member.email),
-                            value: memberId,
-                            groupValue: selectedMemberId,
-                            onChanged: (v) =>
-                                setState(() => selectedMemberId = v),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (selectedMemberId == null || titleController.text.isEmpty) {
-                  return;
-                }
-                try {
-                  final user = context.read<AuthService>().currentUser;
-                  final assignment = TeamAssignmentModel(
-                    id: '',
-                    teamId: team.id,
-                    assignedToUid: selectedMemberId!,
-                    assignedByUid: user!.uid,
-                    title: titleController.text,
-                    description: descController.text,
-                    level: level,
-                    priority: priority,
-                    createdAt: DateTime.now(),
-                  );
-                  await context.read<TeamProvider>().assignTask(
-                    user.uid,
-                    team.id,
-                    selectedMemberId!,
-                    assignment,
-                  );
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Task Assigned')),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              },
-              child: const Text('Assign'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showSubmitProofDialog(TeamAssignmentModel task) {
     File? beforeImage;
     File? afterImage;
@@ -681,16 +494,5 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildProofImage(String base64String) {
-    final bytes = ImageHelper.decodeBase64(base64String);
-    if (bytes == null) {
-      return const SizedBox(
-        height: 100,
-        child: Center(child: Icon(Icons.broken_image, color: Colors.grey)),
-      );
-    }
-    return Image.memory(bytes, height: 100, fit: BoxFit.cover);
   }
 }

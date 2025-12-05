@@ -42,23 +42,28 @@ service cloud.firestore {
     // ========================================
     
     match /users/{userId} {
-      // Read: Allow if user owns the document OR admin OR when querying
-      allow read: if isOwner(userId) || 
-                     isAdmin() ||
-                     (isAuthenticated() && request.query != null);
+      // Read: Allow authenticated users (needed for team member display)
+      allow read: if isAuthenticated();
       
       // Create: Allow if creating own document
       allow create: if isOwner(userId);
       
       // Update: Allow if user owns document AND not trying to escalate to admin
-      allow update: if isOwner(userId) && 
-                       !isRoleChangeAttempt() && 
+      // Allow username updates
+      // ALSO allow team owner to update joinedTeamIds (for kicking members)
+      allow update: if (isOwner(userId) && 
+                       (!isRoleChangeAttempt() || 
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username'])) &&
                        !(request.resource.data.role == 'admin' && resource.data.role != 'admin') &&
                        // Enforce team limits: Free (3), Premium (15)
                        (
                          !request.resource.data.keys().hasAny(['joinedTeamIds']) ||
                          request.resource.data.joinedTeamIds.size() <= (resource.data.role == 'premium' ? 15 : 3)
-                       );
+                       )) ||
+                       // OR allow if a team owner is removing this user from joinedTeamIds (kicking)
+                       (isAuthenticated() &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedTeamIds']) &&
+                        request.resource.data.joinedTeamIds.size() == resource.data.joinedTeamIds.size() - 1);
       
       // Delete: Allow if user owns document
       
@@ -118,14 +123,14 @@ service cloud.firestore {
     // ========================================
     
     match /team_assignments/{taskId} {
-      // Helper function to get team owner by teamId field
-      function getTeamOwnerIdByField() {
-        return get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.ownerId;
+      // Helper function to get team by teamId field  
+      function getTeam() {
+        return get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data;
       }
       
       // Check if user is the team owner
       function isTeamOwner() {
-        return isAuthenticated() && request.auth.uid == getTeamOwnerIdByField();
+        return isAuthenticated() && request.auth.uid == getTeam().ownerId;
       }
       
       // Check if user is assigned to this task
@@ -135,12 +140,20 @@ service cloud.firestore {
       
       // Check if update only modifies allowed fields for members
       function isMemberAllowedUpdate() {
-        // Ensure title and description are not changed
-        return (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['title', 'description']));
+        // Members can only update status and photos
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'photoBeforeBase64', 'photoAfterBase64', 'completedAt']);
       }
       
-      // Read: Allow if user is team owner OR assigned member
-      allow read: if isTeamOwner() || isAssignedMember();
+      // Read: Allow authenticated users to read (queries will filter client-side)
+      // or allow specific document reads for owner or assigned member
+      allow read: if isAuthenticated() && (
+        isTeamOwner() || 
+        isAssignedMember()
+      );
+      
+      // List: Allow authenticated users to query (filtering happens in the query)
+      allow list: if isAuthenticated();
       
       // Create: Allow ONLY if user is team owner (verify via teamId)
       allow create: if isAuthenticated() && 

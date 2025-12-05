@@ -48,8 +48,7 @@ class AuthService {
 
       // Authenticate the user
       AppLogger.log('Authenticating Google user', tag: 'AuthService');
-      final GoogleSignInAccount googleUser = await _googleSignIn
-          .authenticate();
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
 
       // Get authentication tokens (synchronous in version 7.x)
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
@@ -79,11 +78,14 @@ class AuthService {
             'Creating new user document for Google sign in with tenantId: $tenantId',
             tag: 'AuthService',
           );
+          final email = userCredential.user!.email ?? '';
+          final username = email.split('@').first;
           await userDoc.set({
-            'email': userCredential.user!.email,
+            'email': email,
+            'username': username,
             'role': 'free',
             'tenantId': tenantId,
-            'currentTeamId': null,
+            'joinedTeamIds': [],
             'createdAt': FieldValue.serverTimestamp(),
           });
         } else {
@@ -154,11 +156,13 @@ class AuthService {
           'Creating user document for email: $email with tenantId: $tenantId',
           tag: 'AuthService',
         );
+        final username = email.split('@').first;
         await _firestore.collection('users').doc(result.user!.uid).set({
           'email': email,
+          'username': username,
           'role': 'free', // Default to free plan
           'tenantId': tenantId,
-          'currentTeamId': null,
+          'joinedTeamIds': [],
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (e, stack) {

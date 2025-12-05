@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../providers/task_provider.dart';
 import '../models/task_model.dart';
+import '../models/user_model.dart';
 import 'create_task_screen.dart';
 import '../services/notification_service.dart';
+import '../services/notification_scheduler.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/my_teams_screen.dart';
+import '../screens/profile_screen.dart';
+import '../widgets/local_time_widget.dart';
+import 'personal_task_detail_screen.dart';
 
 /// Free Plan Dashboard - Limited to 5 active tasks
 class FreeDashboardScreen extends StatefulWidget {
@@ -266,23 +272,67 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          UserAccountsDrawerHeader(
-            accountName: const Text('Free Plan'),
-            accountEmail: Text(email ?? ''),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                (email ?? 'U')[0].toUpperCase(),
-                style: TextStyle(fontSize: 40.0, color: Colors.blue[600]),
-              ),
-            ),
-            decoration: BoxDecoration(color: Colors.blue[600]),
+          // Username in Drawer Header with StreamBuilder
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(context.read<AuthService>().currentUser?.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              String displayName = email ?? '';
+              if (snapshot.hasData && snapshot.data != null) {
+                final userModel = UserModel.fromFirestore(snapshot.data!);
+                displayName = userModel.username;
+              }
+
+              return UserAccountsDrawerHeader(
+                accountName: Text(displayName),
+                accountEmail: Text(email ?? ''),
+                currentAccountPicture: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileScreen(),
+                      ),
+                    );
+                  },
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      displayName.isNotEmpty
+                          ? displayName[0].toUpperCase()
+                          : 'U',
+                      style: TextStyle(fontSize: 40.0, color: Colors.blue[600]),
+                    ),
+                  ),
+                ),
+                decoration: BoxDecoration(color: Colors.blue[600]),
+              );
+            },
           ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: const LocalTimeWidget(),
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.dashboard),
             title: const Text('Personal Tasks'),
             selected: true,
             onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.person),
+            title: const Text('My Profile'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.group),
@@ -295,12 +345,49 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
               );
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.notifications_active),
+            title: const Text('Check Notifications'),
+            onTap: () async {
+              Navigator.pop(context);
+              await NotificationScheduler.sendTestNotification();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Test notification sent!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
             onTap: () async {
-              await context.read<AuthService>().signOut();
+              // Show confirmation dialog
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('No'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Yes'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (shouldLogout == true && context.mounted) {
+                await context.read<AuthService>().signOut();
+              }
             },
           ),
         ],
@@ -343,6 +430,14 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PersonalTaskDetailScreen(task: task),
+            ),
+          );
+        },
         leading: CircleAvatar(
           backgroundColor: task.isCompleted
               ? Colors.green[100]
