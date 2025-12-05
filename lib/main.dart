@@ -14,6 +14,10 @@ import 'utils/logger.dart';
 import 'theme/app_theme.dart';
 import 'providers/task_provider.dart';
 import 'providers/team_provider.dart';
+import 'services/notification_scheduler.dart';
+import 'services/notification_checker.dart';
+import 'services/notification_background_worker.dart';
+import 'package:workmanager/workmanager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +27,36 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     AppLogger.log('Firebase initialized successfully', tag: 'Main');
+
+    // Initialize notification scheduler
+    await NotificationScheduler.initialize();
+    AppLogger.log('Notification scheduler initialized', tag: 'Main');
+
+    // Initialize WorkManager for background notifications
+    try {
+      await Workmanager().initialize(
+        callbackDispatcher,
+        isInDebugMode:
+            true, // Enabled for testing, user can see notifications in console
+      );
+      // Register periodic task (runs every 15 mins)
+      await Workmanager().registerPeriodicTask(
+        "bg_notification_check",
+        "check_notifications",
+        frequency: const Duration(minutes: 15),
+        constraints: Constraints(
+          networkType:
+              NetworkType.connected, // Needs internet to check Firestore
+        ),
+      );
+      AppLogger.log('WorkManager initialized and task registered', tag: 'Main');
+    } catch (e) {
+      AppLogger.error('Failed to init WorkManager: $e', error: e);
+    }
+
+    // Start notification checker (polls every 60s) for foreground
+    NotificationChecker().start();
+    AppLogger.log('Notification checker started', tag: 'Main');
   } catch (e, stack) {
     AppLogger.error(
       'Firebase initialization error: $e',

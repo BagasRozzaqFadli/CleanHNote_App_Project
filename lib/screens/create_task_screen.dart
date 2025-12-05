@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../services/auth_service.dart';
+import '../services/notification_history_service.dart';
 import '../widgets/task_time_picker.dart';
 
 class CreateTaskScreen extends StatefulWidget {
@@ -68,7 +69,34 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         createdAt: DateTime.now(),
       );
 
-      await context.read<TaskProvider>().createTask(task, user.uid);
+      // Create task and get generated ID
+      final taskId = await context.read<TaskProvider>().createTask(
+        task,
+        user.uid,
+      );
+
+      // Create notification history entries (Firestore-based)
+      if (task.dueDate != null && task.dueTime != null) {
+        try {
+          final dueDateTime = DateTime(
+            task.dueDate!.year,
+            task.dueDate!.month,
+            task.dueDate!.day,
+            task.dueTime!.hour,
+            task.dueTime!.minute,
+          );
+
+          await NotificationHistoryService().createTaskNotifications(
+            userId: user.uid,
+            taskId: taskId,
+            taskTitle: task.title,
+            dueDateTime: dueDateTime,
+          );
+          print('✅ Notification histories created for task: ${task.title}');
+        } catch (e) {
+          print('⚠️ Failed to create notification histories: $e');
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

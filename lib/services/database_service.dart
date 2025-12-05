@@ -28,7 +28,8 @@ class DatabaseService {
 
   /// Create personal task with FREE PLAN LIMIT enforcement
   /// Free users: Max 5 active tasks
-  Future<void> createPersonalTask(TaskModel task, String uid) async {
+  /// Returns the generated task ID
+  Future<String> createPersonalTask(TaskModel task, String uid) async {
     try {
       // Get user to check role
       final userDoc = await _firestore.collection('users').doc(uid).get();
@@ -47,8 +48,11 @@ class DatabaseService {
         }
       }
 
-      // Create the task
-      await _firestore.collection('personal_tasks').add(task.toFirestore());
+      // Create the task and return generated ID
+      final docRef = await _firestore
+          .collection('personal_tasks')
+          .add(task.toFirestore());
+      return docRef.id;
     } catch (e) {
       rethrow;
     }

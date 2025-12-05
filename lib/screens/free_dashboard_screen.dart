@@ -7,7 +7,7 @@ import '../providers/task_provider.dart';
 import '../models/task_model.dart';
 import '../models/user_model.dart';
 import 'create_task_screen.dart';
-import '../services/notification_service.dart';
+import '../services/notification_history_service.dart';
 import '../services/notification_scheduler.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/my_teams_screen.dart';
@@ -24,6 +24,8 @@ class FreeDashboardScreen extends StatefulWidget {
 }
 
 class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
+  int _refreshKey = 0;
+
   @override
   void initState() {
     super.initState();
@@ -69,9 +71,13 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
         foregroundColor: Colors.white,
         actions: [
           StreamBuilder<int>(
-            stream: NotificationService().getUnreadCount(user.uid),
+            key: ValueKey('badge_$_refreshKey'),
+            stream: NotificationHistoryService().getUnshownCount(user.uid),
             builder: (context, snapshot) {
               final unreadCount = snapshot.data ?? 0;
+              print(
+                '🎯 [Dashboard] Badge StreamBuilder rebuild - count: $unreadCount',
+              );
               return Stack(
                 children: [
                   IconButton(
@@ -178,77 +184,98 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
                   colors: [Colors.white, const Color(0xFFE3F2FD)],
                 ),
               ),
-              child: StreamBuilder<List<TaskModel>>(
-                stream: context.read<TaskProvider>().getTasks(user.uid),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  // Trigger a rebuild by calling setState on TaskProvider
+                  await Future.delayed(const Duration(milliseconds: 500));
+                  if (context.mounted) {
+                    await context.read<TaskProvider>().initialize(user.uid);
+                    // Force rebuild to refresh notification badge
+                    if (mounted) {
+                      setState(() {
+                        _refreshKey++;
+                        print('🔄 [Refresh] Key updated to: $_refreshKey');
+                      });
+                    }
                   }
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+                },
+                child: StreamBuilder<List<TaskModel>>(
+                  stream: context.read<TaskProvider>().getTasks(user.uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                  final tasks = snapshot.data ?? [];
-                  final activeTasks = tasks.where((t) => !t.isCompleted).length;
+                    final tasks = snapshot.data ?? [];
+                    final activeTasks = tasks
+                        .where((t) => !t.isCompleted)
+                        .length;
 
-                  if (tasks.isEmpty) {
-                    return _buildEmptyState(context, activeTasks);
-                  }
+                    if (tasks.isEmpty) {
+                      return _buildEmptyState(context, activeTasks);
+                    }
 
-                  return Column(
-                    children: [
-                      // Task Limit Indicator
-                      if (activeTasks >= 3)
-                        Container(
-                          margin: const EdgeInsets.all(16),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: activeTasks >= 5
-                                ? Colors.red[50]
-                                : Colors.orange[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
+                    return Column(
+                      children: [
+                        // Task Limit Indicator
+                        if (activeTasks >= 3)
+                          Container(
+                            margin: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
                               color: activeTasks >= 5
-                                  ? Colors.red
-                                  : Colors.orange,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                activeTasks >= 5 ? Icons.block : Icons.warning,
+                                  ? Colors.red[50]
+                                  : Colors.orange[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
                                 color: activeTasks >= 5
                                     ? Colors.red
                                     : Colors.orange,
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
                                   activeTasks >= 5
-                                      ? 'Task limit reached! Complete or delete tasks to add more.'
-                                      : 'You have $activeTasks/5 active tasks',
-                                  style: TextStyle(
-                                    color: activeTasks >= 5
-                                        ? Colors.red[900]
-                                        : Colors.orange[900],
-                                    fontWeight: FontWeight.bold,
+                                      ? Icons.block
+                                      : Icons.warning,
+                                  color: activeTasks >= 5
+                                      ? Colors.red
+                                      : Colors.orange,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    activeTasks >= 5
+                                        ? 'Task limit reached! Complete or delete tasks to add more.'
+                                        : 'You have $activeTasks/5 active tasks',
+                                    style: TextStyle(
+                                      color: activeTasks >= 5
+                                          ? Colors.red[900]
+                                          : Colors.orange[900],
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                          ),
+                        Expanded(
+                          child: ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            itemCount: tasks.length,
+                            itemBuilder: (context, index) =>
+                                _buildTaskCard(context, tasks[index], user.uid),
                           ),
                         ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: tasks.length,
-                          itemBuilder: (context, index) =>
-                              _buildTaskCard(context, tasks[index], user.uid),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -396,29 +423,35 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context, int activeTasks) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.task_alt, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'No tasks yet',
-            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 8),
-          if (activeTasks < 5)
-            ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CreateTaskScreen(),
-                ),
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.task_alt, size: 80, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'No tasks yet',
+                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
               ),
-              child: const Text('Create Your First Task'),
-            ),
-        ],
-      ),
+              const SizedBox(height: 8),
+              if (activeTasks < 5)
+                ElevatedButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreateTaskScreen(),
+                    ),
+                  ),
+                  child: const Text('Create Your First Task'),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

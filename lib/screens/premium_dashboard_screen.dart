@@ -7,7 +7,7 @@ import '../providers/task_provider.dart';
 import '../models/task_model.dart';
 import '../models/user_model.dart';
 import 'create_task_screen.dart';
-import '../services/notification_service.dart';
+import '../services/notification_history_service.dart';
 import '../services/notification_scheduler.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/my_teams_screen.dart';
@@ -23,6 +23,8 @@ class PremiumDashboardScreen extends StatefulWidget {
 }
 
 class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
+  int _refreshKey = 0;
+
   @override
   void initState() {
     super.initState();
@@ -86,9 +88,13 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
         foregroundColor: Colors.white,
         actions: [
           StreamBuilder<int>(
-            stream: NotificationService().getUnreadCount(user.uid),
+            key: ValueKey('badge_$_refreshKey'),
+            stream: NotificationHistoryService().getUnshownCount(user.uid),
             builder: (context, snapshot) {
               final unreadCount = snapshot.data ?? 0;
+              print(
+                '🎯 [Premium Dashboard] Badge StreamBuilder rebuild - count: $unreadCount',
+              );
               return Stack(
                 children: [
                   IconButton(
@@ -142,26 +148,43 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
             colors: [Colors.white, Colors.indigo[50]!],
           ),
         ),
-        child: StreamBuilder<List<TaskModel>>(
-          stream: context.read<TaskProvider>().getTasks(user.uid),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
+        child: RefreshIndicator(
+          onRefresh: () async {
+            // Trigger a rebuild
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (context.mounted) {
+              await context.read<TaskProvider>().initialize(user.uid);
+              // Force rebuild to refresh notification badge
+              if (mounted) {
+                setState(() {
+                  _refreshKey++;
+                  print('🔄 [Premium Refresh] Key updated to: $_refreshKey');
+                });
+              }
             }
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final tasks = snapshot.data ?? [];
-            if (tasks.isEmpty) {
-              return _buildEmptyState(context);
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: tasks.length,
-              itemBuilder: (context, index) =>
-                  _buildTaskCard(context, tasks[index], user.uid),
-            );
           },
+          child: StreamBuilder<List<TaskModel>>(
+            stream: context.read<TaskProvider>().getTasks(user.uid),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final tasks = snapshot.data ?? [];
+              if (tasks.isEmpty) {
+                return _buildEmptyState(context);
+              }
+              return ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: tasks.length,
+                itemBuilder: (context, index) =>
+                    _buildTaskCard(context, tasks[index], user.uid),
+              );
+            },
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -316,30 +339,36 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.task_alt, size: 100, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'No tasks yet!',
-            style: TextStyle(fontSize: 24, color: Colors.grey[600]),
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.task_alt, size: 100, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'No tasks yet!',
+                style: TextStyle(fontSize: 24, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreateTaskScreen(),
+                    ),
+                  );
+                },
+                child: const Text('Create Your First Task'),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CreateTaskScreen(),
-                ),
-              );
-            },
-            child: const Text('Create Your First Task'),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

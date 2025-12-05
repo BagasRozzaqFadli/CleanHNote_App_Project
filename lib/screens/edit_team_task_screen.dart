@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/team_assignment_model.dart';
 import '../providers/team_provider.dart';
+import '../services/notification_history_service.dart';
 import '../widgets/task_time_picker.dart';
 
 class EditTeamTaskScreen extends StatefulWidget {
@@ -86,6 +87,40 @@ class _EditTeamTaskScreenState extends State<EditTeamTaskScreen> {
         widget.assignment.id,
         updates,
       );
+
+      // Update notification histories if due date/time changed
+      if (_dueDate != null && _dueTime != null) {
+        try {
+          // Delete old notification histories
+          await NotificationHistoryService().deleteNotificationsForTask(
+            widget.assignment.id,
+          );
+
+          // Create new notification histories with updated time
+          final dueDateTime = DateTime(
+            _dueDate!.year,
+            _dueDate!.month,
+            _dueDate!.day,
+            _dueTime!.hour,
+            _dueTime!.minute,
+          );
+
+          await NotificationHistoryService().createTaskNotifications(
+            userId: widget.assignment.assignedToUid, // ✅ Member yang ditugaskan
+            taskId: widget.assignment.id,
+            taskTitle: _titleController.text.trim(),
+            dueDateTime: dueDateTime,
+          );
+          print('✅ Notification histories updated for edited team task');
+        } catch (e) {
+          print('⚠️ Failed to update notification histories: $e');
+        }
+      } else {
+        // If no due date/time, delete all notification histories
+        await NotificationHistoryService().deleteNotificationsForTask(
+          widget.assignment.id,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

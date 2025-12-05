@@ -29,10 +29,11 @@ class TaskProvider with ChangeNotifier {
   }
 
   /// Create personal task with free plan limit enforcement
-  Future<void> createTask(TaskModel task, String uid) async {
+  Future<String> createTask(TaskModel task, String uid) async {
     try {
-      await _dbService.createPersonalTask(task, uid);
+      final taskId = await _dbService.createPersonalTask(task, uid);
       notifyListeners();
+      return taskId;
     } catch (e) {
       rethrow;
     }

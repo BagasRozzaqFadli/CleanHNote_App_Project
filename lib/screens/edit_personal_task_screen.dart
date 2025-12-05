@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 import '../services/auth_service.dart';
+import '../services/notification_history_service.dart';
 import '../widgets/task_time_picker.dart';
 
 /// Screen to edit existing personal task
@@ -224,6 +225,40 @@ class _EditPersonalTaskScreenState extends State<EditPersonalTaskScreen> {
         updates,
         user.uid,
       );
+
+      // Update notification histories if due date/time changed
+      if (_dueDate != null && _dueTime != null) {
+        try {
+          // Delete old notification histories
+          await NotificationHistoryService().deleteNotificationsForTask(
+            widget.task.id,
+          );
+
+          // Create new notification histories with updated time
+          final dueDateTime = DateTime(
+            _dueDate!.year,
+            _dueDate!.month,
+            _dueDate!.day,
+            _dueTime!.hour,
+            _dueTime!.minute,
+          );
+
+          await NotificationHistoryService().createTaskNotifications(
+            userId: user.uid,
+            taskId: widget.task.id,
+            taskTitle: _titleController.text,
+            dueDateTime: dueDateTime,
+          );
+          print('✅ Notification histories updated for edited task');
+        } catch (e) {
+          print('⚠️ Failed to update notification histories: $e');
+        }
+      } else {
+        // If no due date/time, delete all notification histories
+        await NotificationHistoryService().deleteNotificationsForTask(
+          widget.task.id,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

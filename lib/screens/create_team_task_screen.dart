@@ -5,7 +5,7 @@ import '../models/team_assignment_model.dart';
 import '../models/user_model.dart';
 import '../providers/team_provider.dart';
 import '../services/auth_service.dart';
-import '../services/notification_scheduler.dart';
+import '../services/notification_history_service.dart';
 import '../widgets/task_time_picker.dart';
 
 class CreateTeamTaskScreen extends StatefulWidget {
@@ -89,18 +89,28 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
         assignment,
       );
 
-      // Schedule notifications if date and time are set
-      if (_dueDate != null) {
-        final dueTimeString = _dueTime != null
-            ? '${_dueTime!.hour.toString().padLeft(2, '0')}:${_dueTime!.minute.toString().padLeft(2, '0')}'
-            : null;
+      // Create notification history entries if date and time are set
+      if (_dueDate != null && _dueTime != null) {
+        try {
+          final dueDateTime = DateTime(
+            _dueDate!.year,
+            _dueDate!.month,
+            _dueDate!.day,
+            _dueTime!.hour,
+            _dueTime!.minute,
+          );
 
-        await NotificationScheduler.scheduleTaskReminders(
-          taskId: assignment.id,
-          taskTitle: assignment.title,
-          dueDate: _dueDate!,
-          dueTime: dueTimeString,
-        );
+          await NotificationHistoryService().createTaskNotifications(
+            userId:
+                _selectedMemberId!, // ✅ MEMBER yang ditugaskan (bukan owner!)
+            taskId: assignment.id,
+            taskTitle: assignment.title,
+            dueDateTime: dueDateTime,
+          );
+          print('✅ Notification histories created for team task');
+        } catch (e) {
+          print('⚠️ Failed to create notification histories: $e');
+        }
       }
 
       if (mounted) {
