@@ -109,19 +109,19 @@ class TaskModel {
     return DateTime.now().isAfter(dueDateTime!);
   }
 
-  /// Check if task should be deleted (completed OR overdue for 10+ days)
+  /// Check if task should be deleted (completed OR overdue for 7+ days)
   bool get shouldBeDeleted {
     final now = DateTime.now();
 
-    // Delete if task is COMPLETED for 10+ days
+    // Delete if task is COMPLETED for 7+ days
     if (isCompleted && completedAt != null) {
-      return now.difference(completedAt!).inDays > 10;
+      return now.difference(completedAt!).inDays > 7;
     }
 
-    // OR delete if task is OVERDUE (not completed) for 10+ days
+    // OR delete if task is OVERDUE (not completed) for 7+ days
     if (!isCompleted && dueDateTime != null) {
       if (now.isAfter(dueDateTime!)) {
-        return now.difference(dueDateTime!).inDays > 10;
+        return now.difference(dueDateTime!).inDays > 7;
       }
     }
 
@@ -133,17 +133,17 @@ class TaskModel {
   Duration? get timeUntilDeletion {
     final now = DateTime.now();
 
-    // Show countdown if task is COMPLETED (10 days from completion)
+    // Show countdown if task is COMPLETED (7 days from completion)
     if (isCompleted && completedAt != null) {
-      final deletionDate = completedAt!.add(const Duration(days: 10));
+      final deletionDate = completedAt!.add(const Duration(days: 7));
       final remaining = deletionDate.difference(now);
       if (!remaining.isNegative) return remaining;
     }
 
-    // OR show countdown if task is OVERDUE and not completed (10 days from due date)
+    // OR show countdown if task is OVERDUE and not completed (7 days from due date)
     if (!isCompleted && dueDateTime != null) {
       if (now.isAfter(dueDateTime!)) {
-        final deletionDate = dueDateTime!.add(const Duration(days: 10));
+        final deletionDate = dueDateTime!.add(const Duration(days: 7));
         final remaining = deletionDate.difference(now);
         if (!remaining.isNegative) return remaining;
       }

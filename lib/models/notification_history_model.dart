@@ -13,6 +13,8 @@ class NotificationHistoryModel {
   final DateTime createdAt;
   final bool shown; // Has been displayed
   final DateTime? shownAt; // When displayed
+  final String? teamId; // For team assignment notifications
+  final String? assignmentId; // For team assignment notifications
 
   NotificationHistoryModel({
     required this.id,
@@ -24,6 +26,8 @@ class NotificationHistoryModel {
     required this.createdAt,
     this.shown = false,
     this.shownAt,
+    this.teamId,
+    this.assignmentId,
   });
 
   /// Create from Firestore document
@@ -39,6 +43,8 @@ class NotificationHistoryModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       shown: data['shown'] ?? false,
       shownAt: (data['shownAt'] as Timestamp?)?.toDate(),
+      teamId: data['teamId'],
+      assignmentId: data['assignmentId'],
     );
   }
 
@@ -53,6 +59,8 @@ class NotificationHistoryModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'shown': shown,
       'shownAt': shownAt != null ? Timestamp.fromDate(shownAt!) : null,
+      'teamId': teamId,
+      'assignmentId': assignmentId,
     };
   }
 
@@ -68,10 +76,10 @@ class NotificationHistoryModel {
     return DateTime.now().isAfter(scheduledFor) && !shown;
   }
 
-  /// Get time until deletion (10 days from scheduled time)
+  /// Get time until deletion (7 days from scheduled time)
   Duration? get timeUntilDeletion {
     final now = DateTime.now();
-    final deletionDate = scheduledFor.add(const Duration(days: 10));
+    final deletionDate = scheduledFor.add(const Duration(days: 7));
     final remaining = deletionDate.difference(now);
 
     if (remaining.isNegative) return null;

@@ -6,8 +6,10 @@ import '../services/auth_service.dart';
 import '../services/notification_history_service.dart';
 import '../models/notification_history_model.dart';
 import '../models/task_model.dart';
+import '../models/team_assignment_model.dart';
 import '../widgets/realtime_countdown_widget.dart';
 import 'personal_task_detail_screen.dart';
+import 'team_task_detail_screen.dart';
 
 /// Screen to display notification history
 class NotificationsScreen extends StatelessWidget {
@@ -196,9 +198,9 @@ class NotificationsScreen extends StatelessWidget {
     NotificationHistoryModel notification,
     NotificationHistoryService service,
   ) {
-    // Deletion deadline is 10 days after scheduled time
+    // Deletion deadline is 7 days after scheduled time
     final deletionDeadline = notification.scheduledFor.add(
-      const Duration(days: 10),
+      const Duration(days: 7),
     );
 
     return Dismissible(
@@ -332,32 +334,67 @@ class NotificationsScreen extends StatelessWidget {
               );
 
               try {
-                // Fetch the task from Firestore
-                final taskDoc = await FirebaseFirestore.instance
-                    .collection('personal_tasks')
-                    .doc(notification.taskId)
-                    .get();
+                // Check if this is a team assignment notification
+                if (notification.teamId != null &&
+                    notification.assignmentId != null) {
+                  // Fetch team assignment from team_assignments collection
+                  final assignmentDoc = await FirebaseFirestore.instance
+                      .collection('team_assignments')
+                      .doc(notification.assignmentId)
+                      .get();
 
-                if (context.mounted) {
-                  Navigator.pop(context); // Close loading dialog
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close loading dialog
 
-                  if (taskDoc.exists) {
-                    final task = TaskModel.fromFirestore(taskDoc);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            PersonalTaskDetailScreen(task: task),
-                      ),
-                    );
-                  } else {
-                    // Task no longer exists
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Task no longer exists'),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
+                    if (assignmentDoc.exists) {
+                      final assignment = TeamAssignmentModel.fromFirestore(
+                        assignmentDoc,
+                      );
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              TeamTaskDetailScreen(assignment: assignment),
+                        ),
+                      );
+                    } else {
+                      // Assignment no longer exists
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Team assignment no longer exists'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  // Fetch personal task from personal_tasks collection
+                  final taskDoc = await FirebaseFirestore.instance
+                      .collection('personal_tasks')
+                      .doc(notification.taskId)
+                      .get();
+
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close loading dialog
+
+                    if (taskDoc.exists) {
+                      final task = TaskModel.fromFirestore(taskDoc);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              PersonalTaskDetailScreen(task: task),
+                        ),
+                      );
+                    } else {
+                      // Task no longer exists
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Task no longer exists'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
                   }
                 }
               } catch (e) {

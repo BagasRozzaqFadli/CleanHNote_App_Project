@@ -4,6 +4,8 @@ import '../models/task_model.dart';
 import '../models/team_model.dart';
 import '../models/team_assignment_model.dart';
 import 'notification_service.dart';
+import 'notification_history_service.dart';
+import 'notification_scheduler.dart';
 
 /// Result of auto-maintenance operation
 class MaintenanceResult {
@@ -98,6 +100,18 @@ class DatabaseService {
         throw Exception('Unauthorized: Not your task');
       }
 
+      print('🗑️ [DatabaseService] Starting cascade delete for task: $taskId');
+
+      // Delete related notifications and notification history
+      print('🗑️ [DatabaseService] Deleting notifications...');
+      await NotificationHistoryService().deleteNotificationsForTask(taskId);
+
+      // Cancel scheduled OS-level reminder notifications
+      print('🗑️ [DatabaseService] Cancelling scheduled reminders...');
+      await NotificationScheduler.cancelTaskReminders(taskId);
+
+      // Delete the task document
+      print('🗑️ [DatabaseService] Deleting task document...');
       await docRef.delete();
     } catch (e) {
       rethrow;
@@ -404,7 +418,7 @@ class DatabaseService {
   // ============================================================================
 
   /// Create team assignment (OWNER ONLY)
-  Future<void> assignTask(
+  Future<String> assignTask(
     String ownerId,
     String teamId,
     String assignedToUid,
@@ -424,7 +438,7 @@ class DatabaseService {
         throw Exception('User is not a team member');
       }
 
-      await _firestore
+      final docRef = await _firestore
           .collection('team_assignments')
           .add(assignment.toFirestore());
 
@@ -435,6 +449,8 @@ class DatabaseService {
         assignment.title,
         team.name,
       );
+
+      return docRef.id; // Return generated assignment ID
     } catch (e) {
       rethrow;
     }
@@ -553,8 +569,19 @@ class DatabaseService {
       for (var doc in oldPersonalTasks.docs) {
         final task = TaskModel.fromFirestore(doc);
         if (task.shouldBeDeleted) {
+          // CASCADE: Delete related notifications BEFORE deleting task
+          try {
+            await NotificationHistoryService().deleteNotificationsForTask(
+              doc.id,
+            );
+            await NotificationScheduler.cancelTaskReminders(doc.id);
+          } catch (e) {
+            print('⚠️ Could not delete notifications for task ${doc.id}: $e');
+          }
+
           batch.delete(doc.reference);
           deletedCount++;
+          print('🗑️ Auto-deleted personal task: ${task.title}');
         }
       }
 
@@ -567,8 +594,21 @@ class DatabaseService {
       for (var doc in oldTeamAssignments.docs) {
         final assignment = TeamAssignmentModel.fromFirestore(doc);
         if (assignment.shouldBeDeleted) {
+          // CASCADE: Delete related notifications BEFORE deleting assignment
+          try {
+            await NotificationHistoryService().deleteNotificationsForTask(
+              doc.id,
+            );
+            await NotificationScheduler.cancelTaskReminders(doc.id);
+          } catch (e) {
+            print(
+              '⚠️ Could not delete notifications for assignment ${doc.id}: $e',
+            );
+          }
+
           batch.delete(doc.reference);
           deletedCount++;
+          print('🗑️ Auto-deleted team assignment: ${assignment.title}');
         }
       }
 

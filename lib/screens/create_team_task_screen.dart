@@ -106,6 +106,8 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
             taskId: assignment.id,
             taskTitle: assignment.title,
             dueDateTime: dueDateTime,
+            teamId: widget.team.id, // ✅ Team context
+            assignmentId: assignment.id, // ✅ Assignment reference
           );
           print('✅ Notification histories created for team task');
         } catch (e) {

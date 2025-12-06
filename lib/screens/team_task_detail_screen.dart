@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../models/team_assignment_model.dart';
 import '../services/auth_service.dart';
 import '../providers/team_provider.dart';
@@ -9,22 +14,60 @@ import '../widgets/countdown_badge.dart';
 import 'edit_team_task_screen.dart';
 
 /// Detail screen for team assignments with full operations
-class TeamTaskDetailScreen extends StatelessWidget {
+class TeamTaskDetailScreen extends StatefulWidget {
   final TeamAssignmentModel assignment;
-
   const TeamTaskDetailScreen({super.key, required this.assignment});
+  @override
+  State<TeamTaskDetailScreen> createState() => _TeamTaskDetailScreenState();
+}
+
+class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _markAsViewed();
+  }
+
+  /// Mark task as viewed by current user (owner or member)
+  Future<void> _markAsViewed() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final teamProvider = Provider.of<TeamProvider>(context, listen: false);
+    final currentUserId = authService.currentUser?.uid;
+    if (currentUserId == null) return;
+    try {
+      // Check if current user is the team owner
+      final teamDoc = await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(widget.assignment.teamId)
+          .get();
+      if (teamDoc.exists) {
+        final teamData = teamDoc.data()!;
+        final isOwner = teamData['ownerId'] == currentUserId;
+        final isMember = widget.assignment.assignedToUid == currentUserId;
+        // Mark as viewed by owner if they haven't viewed and task needs review
+        if (isOwner && widget.assignment.needsOwnerReview) {
+          await teamProvider.markTaskAsViewedByOwner(widget.assignment.id);
+        }
+        // Mark as viewed by member if they haven't viewed
+        if (isMember && widget.assignment.needsMemberReview) {
+          await teamProvider.markTaskAsViewedByMember(widget.assignment.id);
+        }
+      }
+    } catch (e) {
+      print('Error marking task as viewed: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isOverdue =
-        assignment.dueDateTime != null &&
-        assignment.dueDateTime!.isBefore(DateTime.now()) &&
-        !assignment.isCompleted;
+        widget.assignment.dueDateTime != null &&
+        widget.assignment.dueDateTime!.isBefore(DateTime.now()) &&
+        !widget.assignment.isCompleted;
     final isFuture =
-        assignment.dueDateTime != null &&
-        assignment.dueDateTime!.isAfter(DateTime.now());
+        widget.assignment.dueDateTime != null &&
+        widget.assignment.dueDateTime!.isAfter(DateTime.now());
     final user = context.read<AuthService>().currentUser;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Team Assignment Details'),
@@ -36,9 +79,7 @@ class TeamTaskDetailScreen extends StatelessWidget {
             future: _getTeamOwnerId(context),
             builder: (context, AsyncSnapshot<String?> snapshot) {
               final isOwner = snapshot.data == user?.uid;
-
               if (!isOwner) return const SizedBox.shrink();
-
               return PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
                 onSelected: (value) async {
@@ -88,7 +129,7 @@ class TeamTaskDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: assignment.isCompleted
+                  colors: widget.assignment.isCompleted
                       ? [Colors.green[400]!, Colors.green[600]!]
                       : isOverdue
                       ? [Colors.red[400]!, Colors.red[600]!]
@@ -101,7 +142,7 @@ class TeamTaskDetailScreen extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        assignment.isCompleted
+                        widget.assignment.isCompleted
                             ? Icons.check_circle
                             : isOverdue
                             ? Icons.warning
@@ -112,7 +153,7 @@ class TeamTaskDetailScreen extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          assignment.title,
+                          widget.assignment.title,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -124,11 +165,11 @@ class TeamTaskDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    assignment.isCompleted
+                    widget.assignment.isCompleted
                         ? 'Completed'
                         : isOverdue
                         ? 'Overdue!'
-                        : assignment.status == 'in_progress'
+                        : widget.assignment.status == 'in_progress'
                         ? 'In Progress'
                         : 'Pending',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -136,7 +177,6 @@ class TeamTaskDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
-
             // Main Content
             Padding(
               padding: const EdgeInsets.all(16),
@@ -144,8 +184,9 @@ class TeamTaskDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Countdown Badges Section
-                  if (assignment.timeUntilDeletion != null || isFuture) ...[
-                    if (assignment.timeUntilDeletion != null) ...[
+                  if (widget.assignment.timeUntilDeletion != null ||
+                      isFuture) ...[
+                    if (widget.assignment.timeUntilDeletion != null) ...[
                       Card(
                         elevation: 0,
                         color: Colors.red[50],
@@ -177,7 +218,7 @@ class TeamTaskDetailScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'This task will be permanently deleted in ${assignment.timeUntilDeletion!.inDays} days because it was completed late.',
+                                'This task will be permanently deleted in ${widget.assignment.timeUntilDeletion!.inDays} days because it was completed late.',
                                 style: TextStyle(color: Colors.red[900]),
                               ),
                             ],
@@ -206,7 +247,7 @@ class TeamTaskDetailScreen extends StatelessWidget {
                               _buildCountdownItem(
                                 context,
                                 'Time until task starts',
-                                assignment.dueDateTime!.difference(
+                                widget.assignment.dueDateTime!.difference(
                                   DateTime.now(),
                                 ),
                                 Colors.indigo,
@@ -214,10 +255,12 @@ class TeamTaskDetailScreen extends StatelessWidget {
                               const SizedBox(height: 8),
                             ],
                             // Countdown to deletion
-                            if (assignment.timeUntilDeletion != null)
+                            if (widget.assignment.timeUntilDeletion != null)
                               CountdownBadge(
-                                timeUntilDeletion: assignment.timeUntilDeletion,
-                                countdownText: assignment.deletionCountdownText,
+                                timeUntilDeletion:
+                                    widget.assignment.timeUntilDeletion,
+                                countdownText:
+                                    widget.assignment.deletionCountdownText,
                               ),
                           ],
                         ),
@@ -225,7 +268,6 @@ class TeamTaskDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                   ],
-
                   // Task Info Card
                   Card(
                     elevation: 2,
@@ -242,8 +284,8 @@ class TeamTaskDetailScreen extends StatelessWidget {
                             ),
                           ),
                           const Divider(),
-                          if (assignment.description != null &&
-                              assignment.description!.isNotEmpty) ...[
+                          if (widget.assignment.description != null &&
+                              widget.assignment.description!.isNotEmpty) ...[
                             const Text(
                               'Description:',
                               style: TextStyle(
@@ -253,53 +295,53 @@ class TeamTaskDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              assignment.description!,
+                              widget.assignment.description!,
                               style: const TextStyle(fontSize: 16),
                             ),
                             const SizedBox(height: 16),
                           ],
                           _buildInfoRow(
                             'Level',
-                            assignment.level ?? 'Easy',
+                            widget.assignment.level ?? 'Easy',
                             Icons.trending_up,
                           ),
                           _buildInfoRow(
                             'Priority',
-                            assignment.priority ?? 'Medium',
+                            widget.assignment.priority ?? 'Medium',
                             Icons.flag,
                           ),
                           _buildInfoRow(
                             'Category',
-                            assignment.category ?? 'General',
+                            widget.assignment.category ?? 'General',
                             Icons.category,
                           ),
-                          if (assignment.dueDate != null)
+                          if (widget.assignment.dueDate != null)
                             _buildInfoRow(
                               'Due Date',
                               DateFormat(
                                 'EEEE, MMM d, yyyy',
-                              ).format(assignment.dueDate!),
+                              ).format(widget.assignment.dueDate!),
                               Icons.calendar_today,
                             ),
-                          if (assignment.dueTime != null)
+                          if (widget.assignment.dueTime != null)
                             _buildInfoRow(
                               'Due Time',
-                              assignment.dueTime!.format(context),
+                              widget.assignment.dueTime!.format(context),
                               Icons.access_time,
                             ),
                           _buildInfoRow(
                             'Created',
                             DateFormat(
                               'MMM d, yyyy',
-                            ).format(assignment.createdAt),
+                            ).format(widget.assignment.createdAt),
                             Icons.add_circle_outline,
                           ),
-                          if (assignment.completedAt != null)
+                          if (widget.assignment.completedAt != null)
                             _buildInfoRow(
                               'Completed',
                               DateFormat(
                                 'MMM d, yyyy',
-                              ).format(assignment.completedAt!),
+                              ).format(widget.assignment.completedAt!),
                               Icons.check_circle_outline,
                             ),
                         ],
@@ -309,10 +351,14 @@ class TeamTaskDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
+
+            // Proof of Work Photos Section
+            const SizedBox(height: 16),
+            _buildProofPhotosSection(context, user?.uid ?? ''),
           ],
         ),
       ),
-      bottomNavigationBar: !assignment.isCompleted
+      bottomNavigationBar: !widget.assignment.isCompleted
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -380,7 +426,6 @@ class TeamTaskDetailScreen extends StatelessWidget {
     final days = duration.inDays;
     final hours = duration.inHours % 24;
     final minutes = duration.inMinutes % 60;
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -443,9 +488,8 @@ class TeamTaskDetailScreen extends StatelessWidget {
     try {
       final teamDoc = await FirebaseFirestore.instance
           .collection('teams')
-          .doc(assignment.teamId)
+          .doc(widget.assignment.teamId)
           .get();
-
       if (teamDoc.exists) {
         return teamDoc.data()?['ownerId'];
       }
@@ -476,11 +520,11 @@ class TeamTaskDetailScreen extends StatelessWidget {
         ],
       ),
     );
-
     if (confirmed == true && context.mounted) {
       try {
-        await context.read<TeamProvider>().deleteTeamAssignment(assignment.id);
-
+        await context.read<TeamProvider>().deleteTeamAssignment(
+          widget.assignment.id,
+        );
         if (context.mounted) {
           Navigator.pop(context); // Go back to dashboard
           ScaffoldMessenger.of(context).showSnackBar(
@@ -507,7 +551,225 @@ class TeamTaskDetailScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditTeamTaskScreen(assignment: assignment),
+        builder: (context) => EditTeamTaskScreen(assignment: widget.assignment),
+      ),
+    );
+  }
+
+  /// Compress image to WebP Base64
+  Future<String?> _compressImageToBase64(File imageFile) async {
+    try {
+      final Uint8List? compressedBytes =
+          await FlutterImageCompress.compressWithFile(
+            imageFile.path,
+            quality: 70,
+            format: CompressFormat.webp,
+          );
+
+      if (compressedBytes == null) return null;
+      return base64Encode(compressedBytes);
+    } catch (e) {
+      print('Error compressing image: $e');
+      return null;
+    }
+  }
+
+  /// Pick and upload BEFORE photo
+  Future<void> _uploadBeforePhoto(BuildContext context) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+
+    if (image == null) return;
+
+    try {
+      final compressedBase64 = await _compressImageToBase64(File(image.path));
+      if (compressedBase64 == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to compress image')),
+          );
+        }
+        return;
+      }
+
+      if (context.mounted) {
+        await context.read<TeamProvider>().updateTeamAssignment(
+          widget.assignment.id,
+          widget.assignment.copyWith(photoBeforeBase64: compressedBase64).toFirestore(),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✓ Before photo uploaded!')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading photo: $e')));
+      }
+    }
+  }
+
+  /// Pick and upload AFTER photo
+  Future<void> _uploadAfterPhoto(BuildContext context) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+
+    if (image == null) return;
+
+    try {
+      final compressedBase64 = await _compressImageToBase64(File(image.path));
+      if (compressedBase64 == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to compress image')),
+          );
+        }
+        return;
+      }
+
+      if (context.mounted) {
+        await context.read<TeamProvider>().updateTeamAssignment(
+          widget.assignment.id,
+          widget.assignment.copyWith(photoAfterBase64: compressedBase64).toFirestore(),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✓ After photo uploaded!')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading photo: $e')));
+      }
+    }
+  }
+
+  /// Build proof photos section
+  Widget _buildProofPhotosSection(BuildContext context, String currentUserId) {
+    final isAssignedMember = widget.assignment.assignedToUid == currentUserId;
+    final canUpload = isAssignedMember && !widget.assignment.isCompleted;
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '📸 Proof of Work',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+
+            // Before Photo
+            const Text(
+              'Before Photo:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            if (widget.assignment.photoBeforeBase64 != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  base64Decode(widget.assignment.photoBeforeBase64!),
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(child: Text('No before photo yet')),
+              ),
+
+            if (canUpload) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _uploadBeforePhoto(context),
+                  icon: const Icon(Icons.camera_alt),
+                  label: Text(
+                    widget.assignment.photoBeforeBase64 != null
+                        ? 'Retake Before Photo'
+                        : 'Take Before Photo',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+
+            // After Photo
+            const Text(
+              'After Photo:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            if (widget.assignment.photoAfterBase64 != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  base64Decode(widget.assignment.photoAfterBase64!),
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(child: Text('No after photo yet')),
+              ),
+
+            if (canUpload) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _uploadAfterPhoto(context),
+                  icon: const Icon(Icons.camera_alt),
+                  label: Text(
+                    widget.assignment.photoAfterBase64 != null
+                        ? 'Retake After Photo'
+                        : 'Take After Photo',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

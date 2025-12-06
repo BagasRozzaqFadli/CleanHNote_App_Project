@@ -4,6 +4,8 @@ import '../models/team_model.dart';
 import '../models/team_assignment_model.dart';
 import '../models/user_model.dart';
 import '../services/database_service.dart';
+import '../services/notification_history_service.dart';
+import '../services/notification_scheduler.dart';
 
 /// Provider for team management and assignments
 class TeamProvider with ChangeNotifier {
@@ -125,10 +127,19 @@ class TeamProvider with ChangeNotifier {
 
   /// Delete team assignment (owner only)
   Future<void> deleteTeamAssignment(String assignmentId) async {
+    // Delete related notifications and notification history
+    await NotificationHistoryService().deleteNotificationsForTask(assignmentId);
+
+    // Cancel scheduled OS-level reminder notifications
+    await NotificationScheduler.cancelTaskReminders(assignmentId);
+
+    // Delete the assignment document
     await FirebaseFirestore.instance
         .collection('team_assignments')
         .doc(assignmentId)
         .delete();
+
+    print('✅ Team assignment and related notifications deleted');
   }
 
   /// Submit proof of work
@@ -205,5 +216,78 @@ class TeamProvider with ChangeNotifier {
   /// Get user
   Future<UserModel?> getUser(String uid) async {
     return await _dbService.getUser(uid);
+  }
+
+  // ============================================================================
+  // BADGE TRACKING
+  // ============================================================================
+
+  /// Mark task as viewed by owner
+  Future<void> markTaskAsViewedByOwner(String assignmentId) async {
+    await FirebaseFirestore.instance
+        .collection('team_assignments')
+        .doc(assignmentId)
+        .update({'viewedByOwner': true});
+  }
+
+  /// Mark task as viewed by member
+  Future<void> markTaskAsViewedByMember(String assignmentId) async {
+    await FirebaseFirestore.instance
+        .collection('team_assignments')
+        .doc(assignmentId)
+        .update({'viewedByMember': true});
+  }
+
+  /// Get unviewed count for a specific team (for owner badge on team card)
+  Stream<int> getUnviewedCountForTeam(String teamId) {
+    return FirebaseFirestore.instance
+        .collection('team_assignments')
+        .where('teamId', isEqualTo: teamId)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => TeamAssignmentModel.fromFirestore(doc))
+              .where((assignment) => assignment.needsOwnerReview)
+              .length;
+        });
+  }
+
+  /// Get total unviewed count across all owned teams (for drawer badge)
+  Stream<int> getTotalUnviewedCountForOwner(String userId) {
+    return FirebaseFirestore.instance
+        .collection('teams')
+        .where('ownerId', isEqualTo: userId)
+        .snapshots()
+        .asyncMap((teamsSnapshot) async {
+          int totalCount = 0;
+          for (var teamDoc in teamsSnapshot.docs) {
+            final assignmentsSnapshot = await FirebaseFirestore.instance
+                .collection('team_assignments')
+                .where('teamId', isEqualTo: teamDoc.id)
+                .get();
+
+            final count = assignmentsSnapshot.docs
+                .map((doc) => TeamAssignmentModel.fromFirestore(doc))
+                .where((assignment) => assignment.needsOwnerReview)
+                .length;
+
+            totalCount += count;
+          }
+          return totalCount;
+        });
+  }
+
+  /// Get unviewed count for member (new assignments not yet viewed)
+  Stream<int> getUnviewedCountForMember(String userId) {
+    return FirebaseFirestore.instance
+        .collection('team_assignments')
+        .where('assignedToUid', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => TeamAssignmentModel.fromFirestore(doc))
+              .where((assignment) => assignment.needsMemberReview)
+              .length;
+        });
   }
 }

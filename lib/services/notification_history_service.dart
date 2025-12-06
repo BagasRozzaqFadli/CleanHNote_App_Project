@@ -214,6 +214,8 @@ class NotificationHistoryService {
     required String taskId,
     required String taskTitle,
     required DateTime dueDateTime,
+    String? teamId,
+    String? assignmentId,
   }) async {
     final now = DateTime.now();
 
@@ -243,6 +245,8 @@ class NotificationHistoryService {
           scheduledFor: scheduledFor,
           createdAt: DateTime.now(),
           shown: false,
+          teamId: teamId,
+          assignmentId: assignmentId,
         );
 
         await createNotificationHistory(notification);

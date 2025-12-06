@@ -145,9 +145,9 @@ service cloud.firestore {
           .hasOnly(['status', 'photoBeforeBase64', 'photoAfterBase64', 'completedAt']);
       }
       
-      // Read: Allow authenticated users to read (queries will filter client-side)
-      // or allow specific document reads for owner or assigned member
-      allow read: if isAuthenticated() && (
+      // Read: Allow if user is team owner OR assigned member
+      // For single document reads (.get()), we can check resource.data
+      allow get: if isAuthenticated() && (
         isTeamOwner() || 
         isAssignedMember()
       );
@@ -161,10 +161,18 @@ service cloud.firestore {
       
       // Update: Team owner can update all, assigned members can only update specific fields
       allow update: if isTeamOwner() || 
-                       (isAssignedMember() && isMemberAllowedUpdate());
+                       (isAssignedMember() && isMemberAllowedUpdate()) ||
+                       // Allow member to mark as viewed
+                       (isAuthenticated() && 
+                        resource.data.assignedToUid == request.auth.uid &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedByMember'])) ||
+                       // Allow owner to mark as viewed
+                       (isAuthenticated() &&
+                        isTeamOwner() &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedByOwner']));
       
-      // Delete: Allow ONLY team owner
-      allow delete: if isTeamOwner();
+      // Delete: Allow team owner OR assigned member (for auto-cleanup)
+      allow delete: if isTeamOwner() || isAssignedMember();
     }
 
     // ========================================
@@ -181,13 +189,22 @@ service cloud.firestore {
       allow read: if request.auth != null && 
                   resource.data.userId == request.auth.uid;
       
+      // Allow create for:
+      // 1. Personal tasks: user creating for themselves
+      // 2. Team assignments: team owner creating for their members
       allow create: if request.auth != null &&
-                    request.resource.data.userId == request.auth.uid &&
                     request.resource.data.keys().hasAll([
                       'userId', 'taskId', 'taskTitle', 
                       'notificationType', 'scheduledFor', 
                       'createdAt', 'shown'
-                    ]);
+                    ]) &&
+                    (
+                      // User creating notification for themselves
+                      request.resource.data.userId == request.auth.uid ||
+                      // OR Team owner creating notification for team member
+                      (request.resource.data.teamId != null &&
+                       request.auth.uid == get(/databases/$(database)/documents/teams/$(request.resource.data.teamId)).data.ownerId)
+                    );
       
       allow update: if request.auth != null &&
                     resource.data.userId == request.auth.uid &&
@@ -197,6 +214,50 @@ service cloud.firestore {
       
       allow delete: if request.auth != null &&
                     resource.data.userId == request.auth.uid;
+    }
+    
+    // ========================================
+    // F. NOTIFICATIONS COLLECTION
+    // ========================================
+    
+    match /notifications/{notificationId} {
+      // Read: Allow if notification is for the current user
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Create: Allow authenticated users to create notifications
+      // (for team owners creating assignment notifications for members)
+      allow create: if isAuthenticated() && request.resource.data.userId != null;
+      
+      // Update: Allow if notification belongs to user (for marking as shown)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Delete: Allow if notification belongs to user OR if auto-cleanup
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // ========================================
+    // G. NOTIFICATION HISTORY COLLECTION
+    // ========================================
+    
+    match /notification_history/{historyId} {
+      // Read: Allow if notification belongs to the current user
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // List: Allow authenticated users to query their notifications
+      // Also needed for cascade delete when querying by taskId
+      allow list: if isAuthenticated();
+      
+      // Create: Allow authenticated users to create notification history
+      // (for team owners creating reminder histories for members)
+      allow create: if isAuthenticated() && request.resource.data.userId != null;
+      
+      // Update: Allow if notification belongs to user (shouldn't be needed)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Delete: Allow if notification belongs to user
+      // OR if authenticated user is deleting via taskId (cascade delete)
+      // The app validates task ownership before cascade delete
+      allow delete: if isAuthenticated();
     }
   }
 }

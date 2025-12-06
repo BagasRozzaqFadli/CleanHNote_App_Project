@@ -19,6 +19,8 @@ class TeamAssignmentModel {
   final String? photoAfterBase64; // Base64 WebP string
   final DateTime? completedAt;
   final DateTime createdAt;
+  final bool viewedByOwner; // Has owner viewed completed/overdue task
+  final bool viewedByMember; // Has member viewed new assignment
 
   TeamAssignmentModel({
     required this.id,
@@ -37,6 +39,8 @@ class TeamAssignmentModel {
     this.photoAfterBase64,
     this.completedAt,
     required this.createdAt,
+    this.viewedByOwner = false,
+    this.viewedByMember = false,
   });
 
   /// Convert from Firestore document
@@ -72,6 +76,8 @@ class TeamAssignmentModel {
       photoAfterBase64: data['photoAfterBase64'],
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      viewedByOwner: data['viewedByOwner'] ?? false,
+      viewedByMember: data['viewedByMember'] ?? false,
     );
   }
 
@@ -102,6 +108,8 @@ class TeamAssignmentModel {
           ? Timestamp.fromDate(completedAt!)
           : null,
       'createdAt': Timestamp.fromDate(createdAt),
+      'viewedByOwner': viewedByOwner,
+      'viewedByMember': viewedByMember,
     };
   }
 
@@ -125,19 +133,19 @@ class TeamAssignmentModel {
     return DateTime.now().difference(completedAt!).inDays > 7;
   }
 
-  /// Check if task should be deleted (completed OR overdue for 10+ days)
+  /// Check if task should be deleted (completed OR overdue for 7+ days)
   bool get shouldBeDeleted {
     final now = DateTime.now();
 
-    // Delete if task is COMPLETED for 10+ days
+    // Delete if task is COMPLETED for 7+ days
     if (status == 'done' && completedAt != null) {
-      return now.difference(completedAt!).inDays > 10;
+      return now.difference(completedAt!).inDays > 7;
     }
 
-    // OR delete if task is OVERDUE (not completed) for 10+ days
+    // OR delete if task is OVERDUE (not completed) for 7+ days
     if (status != 'done' && dueDateTime != null) {
       if (now.isAfter(dueDateTime!)) {
-        return now.difference(dueDateTime!).inDays > 10;
+        return now.difference(dueDateTime!).inDays > 7;
       }
     }
 
@@ -149,17 +157,17 @@ class TeamAssignmentModel {
   Duration? get timeUntilDeletion {
     final now = DateTime.now();
 
-    // Show countdown if task is COMPLETED (10 days from completion)
+    // Show countdown if task is COMPLETED (7 days from completion)
     if (status == 'done' && completedAt != null) {
-      final deletionDate = completedAt!.add(const Duration(days: 10));
+      final deletionDate = completedAt!.add(const Duration(days: 7));
       final remaining = deletionDate.difference(now);
       if (!remaining.isNegative) return remaining;
     }
 
-    // OR show countdown if task is OVERDUE and not completed (10 days from due date)
+    // OR show countdown if task is OVERDUE and not completed (7 days from due date)
     if (status != 'done' && dueDateTime != null) {
       if (now.isAfter(dueDateTime!)) {
-        final deletionDate = dueDateTime!.add(const Duration(days: 10));
+        final deletionDate = dueDateTime!.add(const Duration(days: 7));
         final remaining = deletionDate.difference(now);
         if (!remaining.isNegative) return remaining;
       }
@@ -192,6 +200,27 @@ class TeamAssignmentModel {
   /// Check if task has proof photos
   bool get hasProof => photoBeforeBase64 != null && photoAfterBase64 != null;
 
+  /// Check if task needs owner review (for badge)
+  bool get needsOwnerReview {
+    if (viewedByOwner) return false;
+
+    // Show badge if completed
+    if (status == 'done') return true;
+
+    // OR show badge if overdue
+    if (dueDateTime != null && DateTime.now().isAfter(dueDateTime!)) {
+      if (status != 'done') return true;
+    }
+
+    return false;
+  }
+
+  /// Check if task needs member review (for badge)
+  bool get needsMemberReview {
+    // Show badge for any unviewed assignment
+    return !viewedByMember;
+  }
+
   /// Create a copy with updated fields
   TeamAssignmentModel copyWith({
     String? id,
@@ -210,6 +239,8 @@ class TeamAssignmentModel {
     String? photoAfterBase64,
     DateTime? completedAt,
     DateTime? createdAt,
+    bool? viewedByOwner,
+    bool? viewedByMember,
   }) {
     return TeamAssignmentModel(
       id: id ?? this.id,
@@ -228,6 +259,8 @@ class TeamAssignmentModel {
       photoAfterBase64: photoAfterBase64 ?? this.photoAfterBase64,
       completedAt: completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,
+      viewedByOwner: viewedByOwner ?? this.viewedByOwner,
+      viewedByMember: viewedByMember ?? this.viewedByMember,
     );
   }
 }
