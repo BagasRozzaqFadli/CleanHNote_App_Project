@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
+import '../models/team_model.dart';
+import '../providers/team_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -295,29 +297,137 @@ class _ProfileScreenState extends State<ProfileScreen>
                         const SizedBox(height: 32),
 
                         // Stats Cards Row
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildGlassStatCard(
-                                'Role',
-                                userModel.role.toUpperCase(),
-                                userModel.isPremium ? Icons.star : Icons.person,
-                                userModel.isPremium
-                                    ? Colors.amber
-                                    : Colors.blue,
-                              ),
+                        if (userModel.isPremium)
+                          // Premium: 3 cards (Role, Joined Teams, Created Teams)
+                          StreamBuilder<List<TeamModel>>(
+                            stream: context.read<TeamProvider>().getUserTeams(
+                              user.uid,
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildGlassStatCard(
-                                'Teams',
-                                '${userModel.joinedTeamIds.length}',
-                                Icons.group,
-                                Colors.cyanAccent,
+                            builder: (context, teamSnapshot) {
+                              final teams = teamSnapshot.data ?? [];
+                              final ownedTeams = teams
+                                  .where((t) => t.ownerId == user.uid)
+                                  .length;
+                              final joinedTeams = teams
+                                  .where((t) => t.ownerId != user.uid)
+                                  .length;
+
+                              return Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildGlassStatCard(
+                                          'Role',
+                                          'PREMIUM',
+                                          Icons.star,
+                                          Colors.amber,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildGlassStatCard(
+                                          'Joined',
+                                          '$joinedTeams',
+                                          Icons.group,
+                                          Colors.cyanAccent,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // Created Teams - Full width with horizontal layout
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.2),
+                                      ),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(
+                                          sigmaX: 10,
+                                          sigmaY: 10,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.greenAccent
+                                                    .withOpacity(0.2),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: const Icon(
+                                                Icons.business,
+                                                color: Colors.greenAccent,
+                                                size: 28,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Created Teams',
+                                                    style: TextStyle(
+                                                      color: Colors.white
+                                                          .withOpacity(0.7),
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    '$ownedTeams / 3',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 24,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          )
+                        else
+                          // Free: 2 cards (Role, Joined Teams)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildGlassStatCard(
+                                  'Role',
+                                  'FREE',
+                                  Icons.person,
+                                  Colors.blue,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildGlassStatCard(
+                                  'Teams',
+                                  '${userModel.joinedTeamIds.length}',
+                                  Icons.group,
+                                  Colors.cyanAccent,
+                                ),
+                              ),
+                            ],
+                          ),
 
                         const SizedBox(height: 16),
 

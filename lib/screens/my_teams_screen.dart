@@ -67,35 +67,37 @@ class _MyTeamsScreenState extends State<MyTeamsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 color: Colors.blue[50],
-                child: Column(
-                  children: [
-                    Row(
+                child: StreamBuilder<List<TeamModel>>(
+                  stream: context.read<TeamProvider>().getUserTeams(user.uid),
+                  builder: (context, teamSnapshot) {
+                    final teams = teamSnapshot.data ?? [];
+                    final ownedTeams = teams
+                        .where((t) => t.ownerId == user.uid)
+                        .length;
+                    final joinedTeams = teams
+                        .where((t) => t.ownerId != user.uid)
+                        .length;
+
+                    return Column(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue[800]),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Joined Teams: ${fullUser.joinedTeamIds.length} / ${fullUser.isPremium ? 15 : 3}',
-                            style: TextStyle(
-                              color: Colors.blue[900],
-                              fontWeight: FontWeight.bold,
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.blue[800]),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Joined Teams: $joinedTeams / ${fullUser.isPremium ? 15 : 3}',
+                                style: TextStyle(
+                                  color: Colors.blue[900],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                    // Show Created Teams counter for Premium users
-                    if (fullUser.isPremium)
-                      StreamBuilder<List<TeamModel>>(
-                        stream: context.read<TeamProvider>().getUserTeams(
-                          user.uid,
-                        ),
-                        builder: (context, teamSnapshot) {
-                          final teams = teamSnapshot.data ?? [];
-                          final ownedTeams = teams
-                              .where((t) => t.ownerId == user.uid)
-                              .length;
-                          return Padding(
+                        // Show Created Teams counter for Premium users
+                        if (fullUser.isPremium)
+                          Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Row(
                               children: [
@@ -107,7 +109,7 @@ class _MyTeamsScreenState extends State<MyTeamsScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Created Teams: $ownedTeams / 1',
+                                    'Created Teams: $ownedTeams / 3',
                                     style: TextStyle(
                                       color: Colors.green[900],
                                       fontWeight: FontWeight.bold,
@@ -116,10 +118,10 @@ class _MyTeamsScreenState extends State<MyTeamsScreen> {
                                 ),
                               ],
                             ),
-                          );
-                        },
-                      ),
-                  ],
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
 
@@ -261,24 +263,39 @@ class _MyTeamsScreenState extends State<MyTeamsScreen> {
           return Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Create Team Button (Premium Only)
+              // Create Team Button (Premium Only - if haven't created one yet)
               if (fullUser.isPremium)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: FloatingActionButton.extended(
-                    heroTag: 'create',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CreateTeamScreen(),
-                        ),
-                      );
-                    },
-                    label: const Text('Create Team'),
-                    icon: const Icon(Icons.add_business),
-                    backgroundColor: Colors.green,
-                  ),
+                StreamBuilder<List<TeamModel>>(
+                  stream: context.read<TeamProvider>().getUserTeams(user.uid),
+                  builder: (context, teamSnapshot) {
+                    final teams = teamSnapshot.data ?? [];
+                    final ownedTeams = teams
+                        .where((t) => t.ownerId == user.uid)
+                        .length;
+
+                    // Only show button if user hasn't reached limit (3 teams)
+                    if (ownedTeams >= 3) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: FloatingActionButton.extended(
+                        heroTag: 'create',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CreateTeamScreen(),
+                            ),
+                          );
+                        },
+                        label: const Text('Create Team'),
+                        icon: const Icon(Icons.add_business),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
                 ),
 
               // Join Team Button (Everyone)

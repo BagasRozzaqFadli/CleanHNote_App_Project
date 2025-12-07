@@ -146,14 +146,14 @@ class DatabaseService {
         throw Exception('Only Premium users can create teams');
       }
 
-      // Check if user already owns a team (Max 1 created team for Premium)
+      // Check if user already owns teams (Max 3 created teams for Premium)
       final ownedTeamsQuery = await _firestore
           .collection('teams')
           .where('ownerId', isEqualTo: ownerId)
           .get();
 
-      if (ownedTeamsQuery.docs.isNotEmpty) {
-        throw Exception('Premium users can only create 1 team');
+      if (ownedTeamsQuery.docs.length >= 3) {
+        throw Exception('Premium users can create max 3 teams');
       }
 
       final limit = 15; // Premium limit for joining
@@ -301,6 +301,46 @@ class DatabaseService {
 
       // Delete team document
       await teamDoc.reference.delete();
+
+      // Delete team analytics data from Firestore (non-critical)
+      print('🗑️ Deleting Firestore analytics for team: $teamId');
+      try {
+        final analyticsSnapshot = await _firestore
+            .collection('team_analytics')
+            .where('teamId', isEqualTo: teamId)
+            .get();
+
+        if (analyticsSnapshot.docs.isNotEmpty) {
+          print(
+            '📊 Found ${analyticsSnapshot.docs.length} Firestore analytics documents to delete',
+          );
+
+          final batch = _firestore.batch();
+          for (var doc in analyticsSnapshot.docs) {
+            batch.delete(doc.reference);
+            print('   Deleting analytics doc: ${doc.id}');
+          }
+          await batch.commit();
+          print('✅ Firestore analytics deleted');
+        } else {
+          print('⚠️ No Firestore analytics found');
+        }
+      } catch (e) {
+        print('⚠️ Failed to delete Fire store analytics (continuing): $e');
+        // Continue with deletion even if Firestore analytics fails
+      }
+
+      // Delete team analytics from Appwrite (non-critical)
+      print('🗑️ Deleting Appwrite analytics for team: $teamId');
+      try {
+        final analyticsService = TeamAnalyticsService();
+        analyticsService.initialize();
+        await analyticsService.deleteTeamAnalytics(teamId);
+        print('✅ Appwrite analytics deleted');
+      } catch (e) {
+        print('⚠️ Failed to delete Appwrite analytics (continuing): $e');
+        // Continue with deletion even if Appwrite fails
+      }
 
       // Remove from owner's joinedTeamIds
       await _firestore.collection('users').doc(userId).update({

@@ -259,5 +259,39 @@ service cloud.firestore {
       // The app validates task ownership before cascade delete
       allow delete: if isAuthenticated();
     }
+
+    // ========================================
+    // H. TEAM ANALYTICS COLLECTION
+    // ========================================
+    
+    match /team_analytics/{analyticsId} {
+      // Helper to get team data
+      function getAnalyticsTeam() {
+        return get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data;
+      }
+      
+      // Check if user is team owner
+      function isAnalyticsTeamOwner() {
+        return isAuthenticated() && request.auth.uid == getAnalyticsTeam().ownerId;
+      }
+      
+      // Check if user is team member
+      function isAnalyticsTeamMember() {
+        return isAuthenticated() && request.auth.uid in getAnalyticsTeam().memberIds;
+      }
+      
+      // Read: Allow team owners and members
+      allow read: if isAuthenticated() && (isAnalyticsTeamOwner() || isAnalyticsTeamMember());
+      
+      // Create: Allow team owners (analytics service creates these)
+      allow create: if isAuthenticated();
+      
+      // Update: Allow team owners and members (for updating analytics)
+      allow update: if isAuthenticated() && (isAnalyticsTeamOwner() || isAnalyticsTeamMember());
+      
+      // Delete: Allow team owners (for cascade delete when deleting team)
+      // Also allow authenticated users for cleanup
+      allow delete: if isAuthenticated();
+    }
   }
 }
