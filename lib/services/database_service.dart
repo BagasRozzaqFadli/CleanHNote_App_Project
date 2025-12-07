@@ -6,6 +6,7 @@ import '../models/team_assignment_model.dart';
 import 'notification_history_service.dart';
 import 'notification_scheduler.dart';
 import 'appwrite_service.dart';
+import '../features/analytics/services/team_analytics_service.dart';
 
 /// Result of auto-maintenance operation
 class MaintenanceResult {
@@ -591,6 +592,24 @@ class DatabaseService {
         if (assignment.shouldBeDeleted) {
           // CASCADE: Delete related data BEFORE deleting assignment
           try {
+            // Record analytics for incomplete tasks (overdue + not done)
+            final now = DateTime.now();
+            final isOverdue =
+                assignment.dueDateTime != null &&
+                now.isAfter(assignment.dueDateTime!);
+            if (!assignment.isCompleted && isOverdue) {
+              try {
+                await TeamAnalyticsService().recordTaskIncomplete(
+                  teamId: assignment.teamId,
+                  memberId: assignment.assignedToUid,
+                  taskId: doc.id,
+                );
+                print('📊 Recorded incomplete task analytics');
+              } catch (e) {
+                print('⚠️ Analytics tracking failed: $e');
+              }
+            }
+
             // Delete notifications
             await NotificationHistoryService().deleteNotificationsForTask(
               doc.id,

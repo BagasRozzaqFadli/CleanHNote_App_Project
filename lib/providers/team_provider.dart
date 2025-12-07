@@ -7,6 +7,7 @@ import '../services/database_service.dart';
 import '../services/notification_history_service.dart';
 import '../services/notification_scheduler.dart';
 import '../services/appwrite_service.dart';
+import '../features/analytics/services/team_analytics_service.dart';
 
 /// Provider for team management and assignments
 class TeamProvider with ChangeNotifier {
@@ -20,6 +21,21 @@ class TeamProvider with ChangeNotifier {
   Future<String> createTeam(String ownerId, String teamName) async {
     try {
       final teamId = await _dbService.createTeam(ownerId, teamName);
+
+      // Initialize analytics for the new team
+      try {
+        TeamAnalyticsService().initialize();
+        await TeamAnalyticsService().initializeTeamAnalytics(
+          teamId: teamId,
+          teamName: teamName,
+          ownerId: ownerId,
+        );
+        print('✅ Analytics initialized for team: $teamName');
+      } catch (e) {
+        print('⚠️ Failed to initialize analytics: $e');
+        // Don't fail team creation if analytics initialization fails
+      }
+
       notifyListeners();
       return teamId;
     } catch (e) {
@@ -114,6 +130,33 @@ class TeamProvider with ChangeNotifier {
         assignedToUid,
         assignment,
       );
+
+      // Record analytics - task assignment
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(assignedToUid)
+            .get();
+
+        if (userDoc.exists) {
+          final memberData = userDoc.data()!;
+          await TeamAnalyticsService().recordTaskAssigned(
+            teamId: teamId,
+            memberId: assignedToUid,
+            memberName: memberData['email'] ?? 'Unknown',
+            memberEmail: memberData['email'] ?? 'Unknown',
+            taskId: assignmentId,
+            title: assignment.title,
+            description: assignment.description ?? '',
+            assignedAt: assignment.createdAt,
+            dueAt:
+                assignment.dueDateTime ?? DateTime.now().add(Duration(days: 7)),
+          );
+        }
+      } catch (e) {
+        print('⚠️ Analytics tracking failed: $e');
+      }
+
       notifyListeners();
       return assignmentId;
     } catch (e) {
@@ -158,14 +201,50 @@ class TeamProvider with ChangeNotifier {
   /// Photos should be uploaded using ImageHelper.uploadPhotoToAppwrite() before calling this
   Future<void> submitProof(String assignmentId, String uid) async {
     try {
-      // Update assignment status to 'done' and set completion time
-      await FirebaseFirestore.instance
+      // Get assignment data first for analytics
+      final assignmentDoc = await FirebaseFirestore.instance
           .collection('team_assignments')
           .doc(assignmentId)
-          .update({
-            'status': 'done',
-            'completedAt': FieldValue.serverTimestamp(),
-          });
+          .get();
+
+      if (assignmentDoc.exists) {
+        final assignment = TeamAssignmentModel.fromFirestore(assignmentDoc);
+        final completedAt = DateTime.now();
+        final isLate =
+            assignment.dueDateTime != null &&
+            completedAt.isAfter(assignment.dueDateTime!);
+
+        // Update assignment status to 'done' and set completion time
+        await FirebaseFirestore.instance
+            .collection('team_assignments')
+            .doc(assignmentId)
+            .update({
+              'status': 'done',
+              'completedAt': FieldValue.serverTimestamp(),
+            });
+
+        // Record analytics
+        try {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+
+          if (userDoc.exists) {
+            await TeamAnalyticsService().recordTaskCompleted(
+              teamId: assignment.teamId,
+              memberId: uid,
+              taskId: assignmentId,
+              completedAt: completedAt,
+              isLate: isLate,
+            );
+          }
+        } catch (e) {
+          print('⚠️ Analytics tracking failed: $e');
+          // Don't fail the task completion if analytics fails
+        }
+      }
+
       notifyListeners();
     } catch (e) {
       rethrow;

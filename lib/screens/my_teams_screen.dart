@@ -67,19 +67,58 @@ class _MyTeamsScreenState extends State<MyTeamsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 color: Colors.blue[50],
-                child: Row(
+                child: Column(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue[800]),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Joined Teams: ${fullUser.joinedTeamIds.length} / ${fullUser.isPremium ? 15 : 3}',
-                        style: TextStyle(
-                          color: Colors.blue[900],
-                          fontWeight: FontWeight.bold,
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue[800]),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Joined Teams: ${fullUser.joinedTeamIds.length} / ${fullUser.isPremium ? 15 : 3}',
+                            style: TextStyle(
+                              color: Colors.blue[900],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
+                    // Show Created Teams counter for Premium users
+                    if (fullUser.isPremium)
+                      StreamBuilder<List<TeamModel>>(
+                        stream: context.read<TeamProvider>().getUserTeams(
+                          user.uid,
+                        ),
+                        builder: (context, teamSnapshot) {
+                          final teams = teamSnapshot.data ?? [];
+                          final ownedTeams = teams
+                              .where((t) => t.ownerId == user.uid)
+                              .length;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.business,
+                                  color: Colors.green[800],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Created Teams: $ownedTeams / 1',
+                                    style: TextStyle(
+                                      color: Colors.green[900],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
