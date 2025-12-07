@@ -15,6 +15,7 @@ import '../screens/profile_screen.dart';
 import '../widgets/local_time_widget.dart';
 import 'personal_task_detail_screen.dart';
 import '../providers/team_provider.dart';
+import '../widgets/task_limit_card.dart';
 
 /// Free Plan Dashboard - Limited to 5 active tasks
 class FreeDashboardScreen extends StatefulWidget {
@@ -255,67 +256,37 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
                     }
 
                     final tasks = snapshot.data ?? [];
-                    final activeTasks = tasks
-                        .where((t) => !t.isCompleted)
-                        .length;
+                    final totalTasks =
+                        tasks.length; // Count ALL tasks including completed
 
-                    if (tasks.isEmpty) {
-                      return _buildEmptyState(context, activeTasks);
-                    }
+                    print(
+                      '📊 [FreeDashboard] Total tasks (including completed): $totalTasks',
+                    );
 
                     return Column(
                       children: [
-                        // Task Limit Indicator
-                        if (activeTasks >= 3)
-                          Container(
-                            margin: const EdgeInsets.all(16),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: activeTasks >= 5
-                                  ? Colors.red[50]
-                                  : Colors.orange[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: activeTasks >= 5
-                                    ? Colors.red
-                                    : Colors.orange,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  activeTasks >= 5
-                                      ? Icons.block
-                                      : Icons.warning,
-                                  color: activeTasks >= 5
-                                      ? Colors.red
-                                      : Colors.orange,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    activeTasks >= 5
-                                        ? 'Task limit reached! Complete or delete tasks to add more.'
-                                        : 'You have $activeTasks/5 active tasks',
-                                    style: TextStyle(
-                                      color: activeTasks >= 5
-                                          ? Colors.red[900]
-                                          : Colors.orange[900],
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        // Task Limit Indicator Card - Always visible
+                        TaskLimitCard(
+                          currentCount: totalTasks,
+                          maxLimit: 5,
+                          isPremium: false,
+                        ),
+                        // Tasks List or Empty State
                         Expanded(
-                          child: ListView.builder(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.all(16),
-                            itemCount: tasks.length,
-                            itemBuilder: (context, index) =>
-                                _buildTaskCard(context, tasks[index], user.uid),
-                          ),
+                          child: tasks.isEmpty
+                              ? _buildEmptyState(context, totalTasks)
+                              : ListView.builder(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.all(16),
+                                  itemCount: tasks.length,
+                                  itemBuilder: (context, index) =>
+                                      _buildTaskCard(
+                                        context,
+                                        tasks[index],
+                                        user.uid,
+                                      ),
+                                ),
                         ),
                       ],
                     );

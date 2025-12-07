@@ -38,12 +38,11 @@ class DatabaseService {
       final userDoc = await _firestore.collection('users').doc(uid).get();
       final user = UserModel.fromFirestore(userDoc);
 
-      // If free user, check task count
+      // If free user, check task count (ALL tasks including completed)
       if (user.role == 'free') {
         final tasksQuery = await _firestore
             .collection('personal_tasks')
             .where('userId', isEqualTo: uid)
-            .where('isCompleted', isEqualTo: false)
             .get();
 
         if (tasksQuery.docs.length >= 5) {

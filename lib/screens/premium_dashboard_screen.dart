@@ -15,6 +15,7 @@ import '../screens/profile_screen.dart';
 import '../widgets/local_time_widget.dart';
 import 'personal_task_detail_screen.dart';
 import '../providers/team_provider.dart';
+import '../widgets/task_limit_card.dart';
 
 /// Premium Plan Dashboard - Unlimited tasks with team features
 class PremiumDashboardScreen extends StatefulWidget {
@@ -218,15 +219,26 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
               final tasks = snapshot.data ?? [];
-              if (tasks.isEmpty) {
-                return _buildEmptyState(context);
-              }
-              return ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                itemCount: tasks.length,
-                itemBuilder: (context, index) =>
-                    _buildTaskCard(context, tasks[index], user.uid),
+              final totalTasks =
+                  tasks.length; // Count ALL tasks including completed
+
+              return Column(
+                children: [
+                  // Task Limit Indicator Card - Always visible
+                  TaskLimitCard(currentCount: totalTasks, isPremium: true),
+                  // Tasks List or Empty State
+                  Expanded(
+                    child: tasks.isEmpty
+                        ? _buildEmptyState(context)
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            itemCount: tasks.length,
+                            itemBuilder: (context, index) =>
+                                _buildTaskCard(context, tasks[index], user.uid),
+                          ),
+                  ),
+                ],
               );
             },
           ),
