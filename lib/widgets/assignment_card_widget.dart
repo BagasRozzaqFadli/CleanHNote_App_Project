@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/team_assignment_model.dart';
 import '../screens/team_task_detail_screen.dart';
 import '../services/image_helper.dart';
+import '../services/appwrite_service.dart';
 
 class AssignmentCard extends StatefulWidget {
   final TeamAssignmentModel task;
@@ -233,18 +234,31 @@ class _AssignmentCardState extends State<AssignmentCard> {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              _buildProofThumbnail(
-                                'Before',
-                                widget.task.photoBeforeBase64,
-                              ),
-                              const SizedBox(width: 8),
-                              _buildProofThumbnail(
-                                'After',
-                                widget.task.photoAfterBase64,
-                              ),
-                            ],
+                          FutureBuilder<Map<String, String?>>(
+                            future: AppwriteService().getBothPhotos(
+                              widget.task.id,
+                            ),
+                            builder: (context, snapshot) {
+                              // Get photos from Appwrite or fallback to Firestore
+                              final beforePhoto =
+                                  snapshot.hasData &&
+                                      snapshot.data!['before'] != null
+                                  ? snapshot.data!['before']
+                                  : widget.task.photoBeforeBase64;
+                              final afterPhoto =
+                                  snapshot.hasData &&
+                                      snapshot.data!['after'] != null
+                                  ? snapshot.data!['after']
+                                  : widget.task.photoAfterBase64;
+
+                              return Row(
+                                children: [
+                                  _buildProofThumbnail('Before', beforePhoto),
+                                  const SizedBox(width: 8),
+                                  _buildProofThumbnail('After', afterPhoto),
+                                ],
+                              );
+                            },
                           ),
                         ] else if (!widget.isOwner &&
                             widget.task.assignedToUid == widget.currentUid) ...[

@@ -10,6 +10,7 @@ class AppwriteService {
 
   late Client _client;
   late Databases _databases;
+  late Account _account;
 
   // Appwrite Configuration
   static const String _endpoint = 'https://fra.cloud.appwrite.io/v1';
@@ -17,11 +18,36 @@ class AppwriteService {
   static const String _databaseId = '693558df001f7968fabd';
   static const String _collectionId = 'team_task_photos';
 
+  bool _isAuthenticated = false;
+
   /// Initialize Appwrite client
   void initialize() {
     _client = Client().setEndpoint(_endpoint).setProject(_projectId);
 
     _databases = Databases(_client);
+    _account = Account(_client);
+  }
+
+  /// Ensure user session exists (creates anonymous session if needed)
+  Future<void> _ensureSession() async {
+    if (_isAuthenticated) return;
+
+    try {
+      // Try to get current session
+      await _account.get();
+      _isAuthenticated = true;
+      print('✅ Appwrite: Using existing session');
+    } catch (e) {
+      // No session exists, create anonymous session
+      try {
+        await _account.createAnonymousSession();
+        _isAuthenticated = true;
+        print('✅ Appwrite: Created anonymous session');
+      } catch (e) {
+        print('❌ Appwrite: Failed to create session: $e');
+        rethrow;
+      }
+    }
   }
 
   /// Store photo in Appwrite Documents
@@ -38,6 +64,9 @@ class AppwriteService {
     required String base64Data,
   }) async {
     try {
+      // Ensure user session exists
+      await _ensureSession();
+
       // Create unique document ID: teamTaskId_photoType
       final documentId = '${teamTaskId}_$photoType';
 
@@ -53,6 +82,11 @@ class AppwriteService {
           'createdAt': DateTime.now().toIso8601String(),
           'sizeKB': (base64Data.length * 3 / 4) / 1024,
         },
+        permissions: [
+          Permission.read(Role.any()),
+          Permission.update(Role.any()),
+          Permission.delete(Role.any()),
+        ],
       );
 
       return document.$id;
@@ -80,6 +114,8 @@ class AppwriteService {
     required String base64Data,
   }) async {
     try {
+      await _ensureSession();
+
       final documentId = '${teamTaskId}_$photoType';
 
       final document = await _databases.updateDocument(
@@ -91,6 +127,11 @@ class AppwriteService {
           'updatedAt': DateTime.now().toIso8601String(),
           'sizeKB': (base64Data.length * 3 / 4) / 1024,
         },
+        permissions: [
+          Permission.read(Role.any()),
+          Permission.update(Role.any()),
+          Permission.delete(Role.any()),
+        ],
       );
 
       return document.$id;
@@ -108,6 +149,8 @@ class AppwriteService {
     required String photoType,
   }) async {
     try {
+      await _ensureSession();
+
       final documentId = '${teamTaskId}_$photoType';
 
       final document = await _databases.getDocument(
@@ -129,6 +172,8 @@ class AppwriteService {
     required String photoType,
   }) async {
     try {
+      await _ensureSession();
+
       final documentId = '${teamTaskId}_$photoType';
 
       await _databases.deleteDocument(

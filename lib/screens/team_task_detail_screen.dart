@@ -687,117 +687,133 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     }
   }
 
-  /// Build proof photos section (displays Firestore photos for backward compatibility)
+  /// Build proof photos section (retrieves from Appwrite, falls back to Firestore)
   Widget _buildProofPhotosSection(BuildContext context, String currentUserId) {
     final isAssignedMember = widget.assignment.assignedToUid == currentUserId;
     final canUpload = isAssignedMember && !widget.assignment.isCompleted;
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '📸 Proof of Work',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+    return FutureBuilder<Map<String, String?>>(
+      future: AppwriteService().getBothPhotos(widget.assignment.id),
+      builder: (context, snapshot) {
+        // Get photos from Appwrite or fallback to Firestore
+        final beforePhotoBase64 =
+            snapshot.hasData && snapshot.data!['before'] != null
+            ? snapshot.data!['before']
+            : widget.assignment.photoBeforeBase64;
+        final afterPhotoBase64 =
+            snapshot.hasData && snapshot.data!['after'] != null
+            ? snapshot.data!['after']
+            : widget.assignment.photoAfterBase64;
+
+        return Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '📸 Proof of Work',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Divider(),
+                const SizedBox(height: 8),
+                // Before Photo
+                const Text(
+                  'Before Photo:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                if (beforePhotoBase64 != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      base64Decode(beforePhotoBase64),
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(child: Text('No before photo yet')),
+                  ),
+                if (canUpload) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _uploadBeforePhoto(context),
+                      icon: const Icon(Icons.camera_alt),
+                      label: Text(
+                        beforePhotoBase64 != null
+                            ? 'Retake Before Photo'
+                            : 'Take Before Photo',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                // After Photo
+                const Text(
+                  'After Photo:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                if (afterPhotoBase64 != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      base64Decode(afterPhotoBase64),
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(child: Text('No after photo yet')),
+                  ),
+                if (canUpload) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _uploadAfterPhoto(context),
+                      icon: const Icon(Icons.camera_alt),
+                      label: Text(
+                        afterPhotoBase64 != null
+                            ? 'Retake After Photo'
+                            : 'Take After Photo',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const Divider(),
-            const SizedBox(height: 8),
-            // Before Photo
-            const Text(
-              'Before Photo:',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            if (widget.assignment.photoBeforeBase64 != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(
-                  base64Decode(widget.assignment.photoBeforeBase64!),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              )
-            else
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Center(child: Text('No before photo yet')),
-              ),
-            if (canUpload) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _uploadBeforePhoto(context),
-                  icon: const Icon(Icons.camera_alt),
-                  label: Text(
-                    widget.assignment.photoBeforeBase64 != null
-                        ? 'Retake Before Photo'
-                        : 'Take Before Photo',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            // After Photo
-            const Text(
-              'After Photo:',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            if (widget.assignment.photoAfterBase64 != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(
-                  base64Decode(widget.assignment.photoAfterBase64!),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              )
-            else
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Center(child: Text('No after photo yet')),
-              ),
-            if (canUpload) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _uploadAfterPhoto(context),
-                  icon: const Icon(Icons.camera_alt),
-                  label: Text(
-                    widget.assignment.photoAfterBase64 != null
-                        ? 'Retake After Photo'
-                        : 'Take After Photo',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
