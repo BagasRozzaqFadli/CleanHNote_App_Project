@@ -15,8 +15,14 @@ class TeamAssignmentModel {
   final String? category;
   final String? priority; // 'Low', 'Medium', 'High'
   final String status; // 'pending', 'in_progress', 'done'
-  final String? photoBeforeBase64; // Base64 WebP string
-  final String? photoAfterBase64; // Base64 WebP string
+
+  // IMPORTANT: Photos are stored in Appwrite Documents, NOT Firestore
+  // These fields exist only for backward compatibility with old data
+  // New photos: Use ImageHelper.uploadPhotoToAppwrite() / getPhotoFromAppwrite()
+  // Old photos: Will load from these fields if Appwrite photo doesn't exist
+  final String? photoBeforeBase64; // Base64 WebP (legacy field)
+  final String? photoAfterBase64; // Base64 WebP (legacy field)
+
   final DateTime? completedAt;
   final DateTime createdAt;
   final bool viewedByOwner; // Has owner viewed completed/overdue task
@@ -102,8 +108,9 @@ class TeamAssignmentModel {
       'category': category,
       'priority': priority,
       'status': status,
-      'photoBeforeBase64': photoBeforeBase64,
-      'photoAfterBase64': photoAfterBase64,
+      // Photos NOT saved to Firestore - stored in Appwrite Documents
+      // 'photoBeforeBase64': null, // Explicitly not saving
+      // 'photoAfterBase64': null,  // Explicitly not saving
       'completedAt': completedAt != null
           ? Timestamp.fromDate(completedAt!)
           : null,

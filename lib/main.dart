@@ -17,6 +17,7 @@ import 'providers/team_provider.dart';
 import 'services/notification_scheduler.dart';
 import 'services/notification_checker.dart';
 import 'services/notification_background_worker.dart';
+import 'services/appwrite_service.dart';
 import 'package:workmanager/workmanager.dart';
 
 void main() async {
@@ -27,6 +28,10 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     AppLogger.log('Firebase initialized successfully', tag: 'Main');
+
+    // Initialize Appwrite service for photo storage
+    AppwriteService().initialize();
+    AppLogger.log('Appwrite service initialized', tag: 'Main');
 
     // Initialize notification scheduler
     await NotificationScheduler.initialize();

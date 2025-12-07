@@ -2,9 +2,12 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:cleanhnote/services/appwrite_service.dart';
 
-/// Service for compressing images to WebP Base64 format
-/// Target: < 80KB per image for Firestore storage
+/// Service for compressing images and managing photo storage
+///
+/// Photos are compressed to WebP format and stored in Appwrite Documents as Base64
+/// to avoid exceeding Firestore's 1MB document limit
 class ImageHelper {
   /// Compress image to WebP format and convert to Base64
   ///
@@ -81,6 +84,61 @@ class ImageHelper {
       return base64String;
     } catch (e) {
       print('Error compressing image from bytes: $e');
+      return null;
+    }
+  }
+
+  /// Upload photo to Appwrite Documents
+  ///
+  /// This method compresses the image and uploads it to Appwrite,
+  /// avoiding Firestore's 1MB document limit
+  ///
+  /// Returns: Appwrite document ID if successful, null otherwise
+  static Future<String?> uploadPhotoToAppwrite({
+    required File file,
+    required String teamTaskId,
+    required String photoType, // 'before' or 'after'
+  }) async {
+    try {
+      // Compress image
+      final base64Data = await compressAndConvert(file);
+      if (base64Data == null) {
+        print('Failed to compress image');
+        return null;
+      }
+
+      // Upload to Appwrite
+      final docId = await AppwriteService().storePhoto(
+        teamTaskId: teamTaskId,
+        photoType: photoType,
+        base64Data: base64Data,
+      );
+
+      return docId;
+    } catch (e) {
+      print('Error uploading photo to Appwrite: $e');
+      return null;
+    }
+  }
+
+  /// Retrieve photo from Appwrite Documents
+  ///
+  /// Returns: Uint8List for displaying the image, or null if not found
+  static Future<Uint8List?> getPhotoFromAppwrite({
+    required String teamTaskId,
+    required String photoType,
+  }) async {
+    try {
+      final base64Data = await AppwriteService().getPhoto(
+        teamTaskId: teamTaskId,
+        photoType: photoType,
+      );
+
+      if (base64Data == null) return null;
+
+      return decodeBase64(base64Data);
+    } catch (e) {
+      print('Error retrieving photo from Appwrite: $e');
       return null;
     }
   }

@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 import '../services/database_service.dart';
 import '../services/notification_history_service.dart';
 import '../services/notification_scheduler.dart';
+import '../services/appwrite_service.dart';
 
 /// Provider for team management and assignments
 class TeamProvider with ChangeNotifier {
@@ -139,29 +140,32 @@ class TeamProvider with ChangeNotifier {
     // Cancel scheduled OS-level reminder notifications
     await NotificationScheduler.cancelTaskReminders(assignmentId);
 
+    // Delete photos from Appwrite
+    await AppwriteService().deleteAllPhotosForTask(assignmentId);
+
     // Delete the assignment document
     await FirebaseFirestore.instance
         .collection('team_assignments')
         .doc(assignmentId)
         .delete();
 
-    print('✅ Team assignment and related notifications deleted');
+    print('✅ Team assignment, photos, and related notifications deleted');
   }
 
   /// Submit proof of work
-  Future<void> submitProof(
-    String assignmentId,
-    String photoBeforeBase64,
-    String photoAfterBase64,
-    String uid,
-  ) async {
+  /// NOTE: Photos are now stored in Appwrite Documents separately
+  /// This method only updates the assignment status and completion time
+  /// Photos should be uploaded using ImageHelper.uploadPhotoToAppwrite() before calling this
+  Future<void> submitProof(String assignmentId, String uid) async {
     try {
-      await _dbService.submitTeamProof(
-        assignmentId,
-        photoBeforeBase64,
-        photoAfterBase64,
-        uid,
-      );
+      // Update assignment status to 'done' and set completion time
+      await FirebaseFirestore.instance
+          .collection('team_assignments')
+          .doc(assignmentId)
+          .update({
+            'status': 'done',
+            'completedAt': FieldValue.serverTimestamp(),
+          });
       notifyListeners();
     } catch (e) {
       rethrow;

@@ -457,26 +457,38 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
                       }
                       setState(() => isSubmitting = true);
                       try {
-                        final beforeBase64 =
-                            await ImageHelper.compressAndConvert(beforeImage!);
-                        final afterBase64 =
-                            await ImageHelper.compressAndConvert(afterImage!);
+                        // Upload photos to Appwrite Documents
+                        final beforeDocId =
+                            await ImageHelper.uploadPhotoToAppwrite(
+                              file: beforeImage!,
+                              teamTaskId: task.id,
+                              photoType: 'before',
+                            );
+                        final afterDocId =
+                            await ImageHelper.uploadPhotoToAppwrite(
+                              file: afterImage!,
+                              teamTaskId: task.id,
+                              photoType: 'after',
+                            );
 
-                        if (beforeBase64 == null || afterBase64 == null) {
-                          throw Exception('Image compression failed');
+                        if (beforeDocId == null || afterDocId == null) {
+                          throw Exception(
+                            'Failed to upload photos to Appwrite',
+                          );
                         }
 
+                        // Mark task as complete (photos already in Appwrite)
                         final user = context.read<AuthService>().currentUser;
                         await context.read<TeamProvider>().submitProof(
                           task.id,
-                          beforeBase64,
-                          afterBase64,
                           user!.uid,
                         );
 
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Proof Submitted!')),
+                          const SnackBar(
+                            content: Text('Proof submitted to Appwrite!'),
+                          ),
                         );
                       } catch (e) {
                         ScaffoldMessenger.of(
