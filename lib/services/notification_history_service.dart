@@ -144,11 +144,11 @@ class NotificationHistoryService {
     }
   }
 
-  /// Delete old notifications (10+ days after scheduled time)
+  /// Delete old notifications (7+ days after scheduled time)
   Future<int> deleteOldNotifications(String userId) async {
     try {
       final now = DateTime.now();
-      final cutoffDate = now.subtract(const Duration(days: 10));
+      final cutoffDate = now.subtract(const Duration(days: 7));
 
       final snapshot = await _firestore
           .collection('notification_history')

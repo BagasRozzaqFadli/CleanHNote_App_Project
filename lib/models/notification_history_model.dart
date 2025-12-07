@@ -64,11 +64,11 @@ class NotificationHistoryModel {
     };
   }
 
-  /// Check if this notification should be auto-deleted (10+ days after scheduled time)
+  /// Check if this notification should be auto-deleted (7+ days after scheduled time)
   bool get shouldAutoDelete {
     final now = DateTime.now();
     final age = now.difference(scheduledFor);
-    return age.inDays >= 10;
+    return age.inDays >= 7;
   }
 
   /// Check if notification is overdue (scheduled time has passed)
