@@ -7,22 +7,38 @@ class TaskProvider with ChangeNotifier {
   final DatabaseService _dbService = DatabaseService();
   MaintenanceResult? _maintenanceResult;
   bool _isInitialized = false;
+  DateTime? _lastMaintenanceTime;
+
+  // Run maintenance once per day (24 hours)
+  static const _maintenanceInterval = Duration(hours: 24);
 
   MaintenanceResult? get maintenanceResult => _maintenanceResult;
   bool get isInitialized => _isInitialized;
 
-  /// Initialize provider and run auto-maintenance
+  /// Initialize provider and run auto-maintenance if needed
+  /// Maintenance runs once per day to clean up stale data
   Future<void> initialize(String uid) async {
-    if (_isInitialized) return;
+    final now = DateTime.now();
+
+    // Check if maintenance should run (first time or 24+ hours since last run)
+    final shouldRunMaintenance =
+        _lastMaintenanceTime == null ||
+        now.difference(_lastMaintenanceTime!) >= _maintenanceInterval;
+
+    if (!shouldRunMaintenance) {
+      _isInitialized = true;
+      return;
+    }
 
     try {
-      print('Running auto-maintenance...');
+      print('🧹 Running auto-maintenance (last run: $_lastMaintenanceTime)...');
       _maintenanceResult = await _dbService.runAutoMaintenance(uid);
-      print('Maintenance result: $_maintenanceResult');
+      _lastMaintenanceTime = now;
+      print('✅ Maintenance result: $_maintenanceResult');
       _isInitialized = true;
       notifyListeners();
     } catch (e) {
-      print('Error during initialization: $e');
+      print('❌ Error during maintenance: $e');
       _isInitialized = true;
       notifyListeners();
     }

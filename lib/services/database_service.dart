@@ -5,6 +5,7 @@ import '../models/team_model.dart';
 import '../models/team_assignment_model.dart';
 import 'notification_history_service.dart';
 import 'notification_scheduler.dart';
+import 'appwrite_service.dart';
 
 /// Result of auto-maintenance operation
 class MaintenanceResult {
@@ -518,7 +519,7 @@ class DatabaseService {
 
   /// Run automatic maintenance to clean up old data
   /// RULE 1: Image Pruning (7 days) - Nullify photos in completed team assignments
-  /// RULE 2: Task Deletion (30 days) - Delete old completed/overdue tasks
+  /// RULE 2: Task Deletion (7 days) - Delete old completed/overdue tasks
   /// RULE 3: Notification Cleanup (7 days) - Delete old notifications
   Future<MaintenanceResult> runAutoMaintenance(String uid) async {
     int deletedCount = 0;
@@ -588,15 +589,20 @@ class DatabaseService {
       for (var doc in oldTeamAssignments.docs) {
         final assignment = TeamAssignmentModel.fromFirestore(doc);
         if (assignment.shouldBeDeleted) {
-          // CASCADE: Delete related notifications BEFORE deleting assignment
+          // CASCADE: Delete related data BEFORE deleting assignment
           try {
+            // Delete notifications
             await NotificationHistoryService().deleteNotificationsForTask(
               doc.id,
             );
             await NotificationScheduler.cancelTaskReminders(doc.id);
+
+            // Delete Appwrite photos
+            await AppwriteService().deleteAllPhotosForTask(doc.id);
+            print('🗑️ Deleted Appwrite photos for assignment ${doc.id}');
           } catch (e) {
             print(
-              '⚠️ Could not delete notifications for assignment ${doc.id}: $e',
+              '⚠️ Could not delete cascade data for assignment ${doc.id}: $e',
             );
           }
 
