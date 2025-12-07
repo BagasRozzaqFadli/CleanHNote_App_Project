@@ -194,6 +194,35 @@ class TeamAssignmentModel {
     return 'Auto-delete soon';
   }
 
+  /// Check if task was completed late (after due date)
+  bool get wasCompletedLate {
+    if (status != 'done' || completedAt == null || dueDateTime == null) {
+      return false;
+    }
+    return completedAt!.isAfter(dueDateTime!);
+  }
+
+  /// Get deletion reason message
+  String get deletionReasonMessage {
+    final now = DateTime.now();
+
+    // Completed task
+    if (status == 'done' && completedAt != null) {
+      if (wasCompletedLate) {
+        return 'This task will be permanently deleted in ${timeUntilDeletion!.inDays} days because it was completed late.';
+      } else {
+        return 'This task will be permanently deleted in ${timeUntilDeletion!.inDays} days. It was completed successfully.';
+      }
+    }
+
+    // Overdue and not completed
+    if (status != 'done' && dueDateTime != null && now.isAfter(dueDateTime!)) {
+      return 'This task will be permanently deleted in ${timeUntilDeletion!.inDays} days because it is overdue and not completed.';
+    }
+
+    return 'This task will be automatically deleted soon.';
+  }
+
   /// Check if task is completed
   bool get isCompleted => status == 'done';
 

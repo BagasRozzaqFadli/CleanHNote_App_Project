@@ -110,6 +110,8 @@ class _EditTeamTaskScreenState extends State<EditTeamTaskScreen> {
             taskId: widget.assignment.id,
             taskTitle: _titleController.text.trim(),
             dueDateTime: dueDateTime,
+            teamId: widget.assignment.teamId, // ✅ Team context
+            assignmentId: widget.assignment.id, // ✅ Assignment reference
           );
           print('✅ Notification histories updated for edited team task');
         } catch (e) {

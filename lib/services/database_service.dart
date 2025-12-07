@@ -3,7 +3,6 @@ import '../models/user_model.dart';
 import '../models/task_model.dart';
 import '../models/team_model.dart';
 import '../models/team_assignment_model.dart';
-import 'notification_service.dart';
 import 'notification_history_service.dart';
 import 'notification_scheduler.dart';
 
@@ -442,13 +441,8 @@ class DatabaseService {
           .collection('team_assignments')
           .add(assignment.toFirestore());
 
-      // Send notification to assignee
-      final notificationService = NotificationService();
-      await notificationService.notifyTaskAssigned(
-        assignedToUid,
-        assignment.title,
-        team.name,
-      );
+      // Note: Assignment notification is now created in create_team_task_screen.dart
+      // using NotificationHistoryService to ensure it appears in notification screen
 
       return docRef.id; // Return generated assignment ID
     } catch (e) {

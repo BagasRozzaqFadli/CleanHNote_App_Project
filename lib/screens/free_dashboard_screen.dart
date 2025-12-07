@@ -14,6 +14,7 @@ import '../screens/my_teams_screen.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/local_time_widget.dart';
 import 'personal_task_detail_screen.dart';
+import '../providers/team_provider.dart';
 
 /// Free Plan Dashboard - Limited to 5 active tasks
 class FreeDashboardScreen extends StatefulWidget {
@@ -69,6 +70,50 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
         title: const Text('CleanHNote - Free Plan'),
         backgroundColor: Colors.blue[600],
         foregroundColor: Colors.white,
+        // Add badge to hamburger menu
+        leading: StreamBuilder<int>(
+          stream: context.read<TeamProvider>().getCombinedUnviewedCount(
+            user.uid,
+          ),
+          builder: (context, snapshot) {
+            final teamBadgeCount = snapshot.data ?? 0;
+            return Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () {
+                    Scaffold.of(context).openDrawer();
+                  },
+                ),
+                if (teamBadgeCount > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        teamBadgeCount > 9 ? '9+' : '$teamBadgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         actions: [
           StreamBuilder<int>(
             key: ValueKey('badge_$_refreshKey'),
@@ -362,7 +407,45 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.group),
+            leading: Stack(
+              children: [
+                const Icon(Icons.group),
+                // Badge for My Teams
+                StreamBuilder<int>(
+                  stream: context.read<TeamProvider>().getCombinedUnviewedCount(
+                    context.read<AuthService>().currentUser!.uid,
+                  ),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data ?? 0;
+                    if (count == 0) return const SizedBox.shrink();
+                    return Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
             title: const Text('My Teams'),
             onTap: () {
               Navigator.pop(context);

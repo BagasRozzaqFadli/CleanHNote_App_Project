@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/team_model.dart';
 import '../models/team_assignment_model.dart';
 import '../models/user_model.dart';
+import '../models/notification_history_model.dart';
 import '../providers/team_provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_history_service.dart';
@@ -82,12 +83,33 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
         createdAt: DateTime.now(),
       );
 
-      await context.read<TeamProvider>().assignTask(
+      final assignmentId = await context.read<TeamProvider>().assignTask(
         user.uid,
         widget.team.id,
         _selectedMemberId!,
         assignment,
       );
+
+      // Create IMMEDIATE assignment notification
+      try {
+        await NotificationHistoryService().createNotificationHistory(
+          NotificationHistoryModel(
+            id: '',
+            userId: _selectedMemberId!, // Member receives notification
+            taskId: assignmentId,
+            taskTitle: assignment.title,
+            notificationType: 'assigned', // Special type for assignment
+            scheduledFor: DateTime.now(), // Shows immediately
+            createdAt: DateTime.now(),
+            shown: false,
+            teamId: widget.team.id,
+            assignmentId: assignmentId,
+          ),
+        );
+        print('✅ Immediate assignment notification created');
+      } catch (e) {
+        print('⚠️ Failed to create assignment notification: $e');
+      }
 
       // Create notification history entries if date and time are set
       if (_dueDate != null && _dueTime != null) {
@@ -103,11 +125,11 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
           await NotificationHistoryService().createTaskNotifications(
             userId:
                 _selectedMemberId!, // ✅ MEMBER yang ditugaskan (bukan owner!)
-            taskId: assignment.id,
+            taskId: assignmentId, // ✅ Use the captured assignment ID
             taskTitle: assignment.title,
             dueDateTime: dueDateTime,
             teamId: widget.team.id, // ✅ Team context
-            assignmentId: assignment.id, // ✅ Assignment reference
+            assignmentId: assignmentId, // ✅ Assignment reference
           );
           print('✅ Notification histories created for team task');
         } catch (e) {

@@ -100,15 +100,21 @@ class TeamProvider with ChangeNotifier {
   // ============================================================================
 
   /// Assign task to member (owner only)
-  Future<void> assignTask(
+  Future<String> assignTask(
     String ownerId,
     String teamId,
     String assignedToUid,
     TeamAssignmentModel assignment,
   ) async {
     try {
-      await _dbService.assignTask(ownerId, teamId, assignedToUid, assignment);
+      final assignmentId = await _dbService.assignTask(
+        ownerId,
+        teamId,
+        assignedToUid,
+        assignment,
+      );
       notifyListeners();
+      return assignmentId;
     } catch (e) {
       rethrow;
     }
@@ -288,6 +294,46 @@ class TeamProvider with ChangeNotifier {
               .map((doc) => TeamAssignmentModel.fromFirestore(doc))
               .where((assignment) => assignment.needsMemberReview)
               .length;
+        });
+  }
+
+  /// Get combined unviewed count (owner + member)
+  /// For users who both own teams AND are members of other teams
+  Stream<int> getCombinedUnviewedCount(String userId) {
+    return FirebaseFirestore.instance
+        .collection('teams')
+        .where('ownerId', isEqualTo: userId)
+        .snapshots()
+        .asyncMap((teamsSnapshot) async {
+          int totalOwnerCount = 0;
+
+          // Count owner badges
+          for (var teamDoc in teamsSnapshot.docs) {
+            final assignmentsSnapshot = await FirebaseFirestore.instance
+                .collection('team_assignments')
+                .where('teamId', isEqualTo: teamDoc.id)
+                .get();
+
+            final count = assignmentsSnapshot.docs
+                .map((doc) => TeamAssignmentModel.fromFirestore(doc))
+                .where((assignment) => assignment.needsOwnerReview)
+                .length;
+
+            totalOwnerCount += count;
+          }
+
+          // Count member badges
+          final memberAssignments = await FirebaseFirestore.instance
+              .collection('team_assignments')
+              .where('assignedToUid', isEqualTo: userId)
+              .get();
+
+          final memberCount = memberAssignments.docs
+              .map((doc) => TeamAssignmentModel.fromFirestore(doc))
+              .where((assignment) => assignment.needsMemberReview)
+              .length;
+
+          return totalOwnerCount + memberCount;
         });
   }
 }

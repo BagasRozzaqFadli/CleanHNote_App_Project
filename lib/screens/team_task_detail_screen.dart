@@ -60,327 +60,351 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isOverdue =
-        widget.assignment.dueDateTime != null &&
-        widget.assignment.dueDateTime!.isBefore(DateTime.now()) &&
-        !widget.assignment.isCompleted;
-    final isFuture =
-        widget.assignment.dueDateTime != null &&
-        widget.assignment.dueDateTime!.isAfter(DateTime.now());
     final user = context.read<AuthService>().currentUser;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Team Assignment Details'),
-        backgroundColor: Colors.indigo[600],
-        foregroundColor: Colors.white,
-        actions: [
-          // Check if user is team owner (can edit/delete)
-          FutureBuilder(
-            future: _getTeamOwnerId(context),
-            builder: (context, AsyncSnapshot<String?> snapshot) {
-              final isOwner = snapshot.data == user?.uid;
-              if (!isOwner) return const SizedBox.shrink();
-              return PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) async {
-                  if (value == 'delete') {
-                    await _deleteAssignment(context);
-                  } else if (value == 'edit') {
-                    _editAssignment(context);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, color: Colors.blue),
-                        SizedBox(width: 8),
-                        Text('Edit Task', style: TextStyle(color: Colors.blue)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text(
-                          'Delete Task',
-                          style: TextStyle(color: Colors.red),
+
+    // Use StreamBuilder to listen for real-time updates
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('team_assignments')
+          .doc(widget.assignment.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // Use latest data from stream, fallback to widget.assignment if loading
+        final assignment = snapshot.hasData && snapshot.data!.exists
+            ? TeamAssignmentModel.fromFirestore(snapshot.data!)
+            : widget.assignment;
+
+        final isOverdue =
+            assignment.dueDateTime != null &&
+            assignment.dueDateTime!.isBefore(DateTime.now()) &&
+            !assignment.isCompleted;
+        final isFuture =
+            assignment.dueDateTime != null &&
+            assignment.dueDateTime!.isAfter(DateTime.now());
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Team Assignment Details'),
+            backgroundColor: Colors.indigo[600],
+            foregroundColor: Colors.white,
+            actions: [
+              // Check if user is team owner (can edit/delete)
+              FutureBuilder(
+                future: _getTeamOwnerId(context),
+                builder: (context, AsyncSnapshot<String?> snapshot) {
+                  final isOwner = snapshot.data == user?.uid;
+                  if (!isOwner) return const SizedBox.shrink();
+                  return PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (value) async {
+                      if (value == 'delete') {
+                        await _deleteAssignment(context);
+                      } else if (value == 'edit') {
+                        _editAssignment(context);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text(
+                              'Edit Task',
+                              style: TextStyle(color: Colors.blue),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text(
+                              'Delete Task',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Status Banner
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: assignment.isCompleted
+                          ? [Colors.green[400]!, Colors.green[600]!]
+                          : isOverdue
+                          ? [Colors.red[400]!, Colors.red[600]!]
+                          : [Colors.indigo[400]!, Colors.indigo[600]!],
                     ),
                   ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Status Banner
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: widget.assignment.isCompleted
-                      ? [Colors.green[400]!, Colors.green[600]!]
-                      : isOverdue
-                      ? [Colors.red[400]!, Colors.red[600]!]
-                      : [Colors.indigo[400]!, Colors.indigo[600]!],
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        widget.assignment.isCompleted
-                            ? Icons.check_circle
-                            : isOverdue
-                            ? Icons.warning
-                            : Icons.groups,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          widget.assignment.title,
-                          style: const TextStyle(
+                      Row(
+                        children: [
+                          Icon(
+                            assignment.isCompleted
+                                ? Icons.check_circle
+                                : isOverdue
+                                ? Icons.warning
+                                : Icons.groups,
                             color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                            size: 32,
                           ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              assignment.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        assignment.isCompleted
+                            ? 'Completed'
+                            : isOverdue
+                            ? 'Overdue!'
+                            : assignment.status == 'in_progress'
+                            ? 'In Progress'
+                            : 'Pending',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.assignment.isCompleted
-                        ? 'Completed'
-                        : isOverdue
-                        ? 'Overdue!'
-                        : widget.assignment.status == 'in_progress'
-                        ? 'In Progress'
-                        : 'Pending',
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                ],
-              ),
-            ),
-            // Main Content
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Countdown Badges Section
-                  if (widget.assignment.timeUntilDeletion != null ||
-                      isFuture) ...[
-                    if (widget.assignment.timeUntilDeletion != null) ...[
-                      Card(
-                        elevation: 0,
-                        color: Colors.red[50],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.red[100]!),
+                ),
+                // Main Content
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Countdown Badges Section
+                      if (assignment.timeUntilDeletion != null || isFuture) ...[
+                        if (assignment.timeUntilDeletion != null) ...[
+                          Card(
+                            elevation: 0,
+                            color: Colors.red[50],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.red[100]!),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.timer_off_outlined,
+                                        color: Colors.red[700],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Auto-Deletion Active',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red[900],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    assignment.deletionReasonMessage,
+                                    style: TextStyle(color: Colors.red[900]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        Card(
+                          elevation: 2,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '⏱️ Countdowns',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                // Countdown to start
+                                if (isFuture) ...[
+                                  _buildCountdownItem(
+                                    context,
+                                    'Time until task starts',
+                                    assignment.dueDateTime!.difference(
+                                      DateTime.now(),
+                                    ),
+                                    Colors.indigo,
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
+                                // Countdown to deletion
+                                if (widget.assignment.timeUntilDeletion != null)
+                                  CountdownBadge(
+                                    timeUntilDeletion:
+                                        assignment.timeUntilDeletion,
+                                    countdownText:
+                                        assignment.deletionCountdownText,
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Task Info Card
+                      Card(
+                        elevation: 2,
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.timer_off_outlined,
-                                    color: Colors.red[700],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Auto-Deletion Active',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red[900],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'This task will be permanently deleted in ${widget.assignment.timeUntilDeletion!.inDays} days because it was completed late.',
-                                style: TextStyle(color: Colors.red[900]),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Card(
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '⏱️ Countdowns',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            // Countdown to start
-                            if (isFuture) ...[
-                              _buildCountdownItem(
-                                context,
-                                'Time until task starts',
-                                widget.assignment.dueDateTime!.difference(
-                                  DateTime.now(),
+                              const Text(
+                                '📋 Details',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                Colors.indigo,
                               ),
-                              const SizedBox(height: 8),
+                              const Divider(),
+                              if (widget.assignment.description != null &&
+                                  widget
+                                      .assignment
+                                      .description!
+                                      .isNotEmpty) ...[
+                                const Text(
+                                  'Description:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  assignment.description!,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              _buildInfoRow(
+                                'Level',
+                                assignment.level ?? 'Easy',
+                                Icons.trending_up,
+                              ),
+                              _buildInfoRow(
+                                'Priority',
+                                assignment.priority ?? 'Medium',
+                                Icons.flag,
+                              ),
+                              _buildInfoRow(
+                                'Category',
+                                assignment.category ?? 'General',
+                                Icons.category,
+                              ),
+                              if (assignment.dueDate != null)
+                                _buildInfoRow(
+                                  'Due Date',
+                                  DateFormat(
+                                    'EEEE, MMM d, yyyy',
+                                  ).format(assignment.dueDate!),
+                                  Icons.calendar_today,
+                                ),
+                              if (assignment.dueTime != null)
+                                _buildInfoRow(
+                                  'Due Time',
+                                  assignment.dueTime!.format(context),
+                                  Icons.access_time,
+                                ),
+                              _buildInfoRow(
+                                'Created',
+                                DateFormat(
+                                  'MMM d, yyyy',
+                                ).format(assignment.createdAt),
+                                Icons.add_circle_outline,
+                              ),
+                              if (assignment.completedAt != null)
+                                _buildInfoRow(
+                                  'Completed',
+                                  DateFormat(
+                                    'MMM d, yyyy',
+                                  ).format(assignment.completedAt!),
+                                  Icons.check_circle_outline,
+                                ),
                             ],
-                            // Countdown to deletion
-                            if (widget.assignment.timeUntilDeletion != null)
-                              CountdownBadge(
-                                timeUntilDeletion:
-                                    widget.assignment.timeUntilDeletion,
-                                countdownText:
-                                    widget.assignment.deletionCountdownText,
-                              ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  // Task Info Card
-                  Card(
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '📋 Details',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Divider(),
-                          if (widget.assignment.description != null &&
-                              widget.assignment.description!.isNotEmpty) ...[
-                            const Text(
-                              'Description:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.assignment.description!,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          _buildInfoRow(
-                            'Level',
-                            widget.assignment.level ?? 'Easy',
-                            Icons.trending_up,
-                          ),
-                          _buildInfoRow(
-                            'Priority',
-                            widget.assignment.priority ?? 'Medium',
-                            Icons.flag,
-                          ),
-                          _buildInfoRow(
-                            'Category',
-                            widget.assignment.category ?? 'General',
-                            Icons.category,
-                          ),
-                          if (widget.assignment.dueDate != null)
-                            _buildInfoRow(
-                              'Due Date',
-                              DateFormat(
-                                'EEEE, MMM d, yyyy',
-                              ).format(widget.assignment.dueDate!),
-                              Icons.calendar_today,
-                            ),
-                          if (widget.assignment.dueTime != null)
-                            _buildInfoRow(
-                              'Due Time',
-                              widget.assignment.dueTime!.format(context),
-                              Icons.access_time,
-                            ),
-                          _buildInfoRow(
-                            'Created',
-                            DateFormat(
-                              'MMM d, yyyy',
-                            ).format(widget.assignment.createdAt),
-                            Icons.add_circle_outline,
-                          ),
-                          if (widget.assignment.completedAt != null)
-                            _buildInfoRow(
-                              'Completed',
-                              DateFormat(
-                                'MMM d, yyyy',
-                              ).format(widget.assignment.completedAt!),
-                              Icons.check_circle_outline,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Proof of Work Photos Section
-            const SizedBox(height: 16),
-            _buildProofPhotosSection(context, user?.uid ?? ''),
-          ],
-        ),
-      ),
-      bottomNavigationBar: !widget.assignment.isCompleted
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: ElevatedButton.icon(
-                  onPressed: () =>
-                      _completeAssignment(context, user?.uid ?? ''),
-                  icon: const Icon(Icons.check),
-                  label: const Text('Mark as Complete'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    ],
                   ),
                 ),
-              ),
-            )
-          : null,
-    );
+
+                // Proof of Work Photos Section
+                const SizedBox(height: 16),
+                _buildProofPhotosSection(context, user?.uid ?? '', assignment),
+              ],
+            ),
+          ),
+          bottomNavigationBar: !assignment.isCompleted
+              ? SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: ElevatedButton.icon(
+                      onPressed: () =>
+                          _completeAssignment(context, user?.uid ?? ''),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Mark as Complete'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+        );
+      }, // End of StreamBuilder builder
+    ); // End of StreamBuilder
   }
 
   Widget _buildInfoRow(String label, String value, IconData icon) {
@@ -470,17 +494,57 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
   }
 
   Future<void> _completeAssignment(BuildContext context, String uid) async {
-    // Team assignments require proof photos to complete
-    // Show message directing user to submit proof instead
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Team assignments require proof photos. Please submit before/after photos to complete this assignment.',
+    // Validate both photos are uploaded
+    if (widget.assignment.photoBeforeBase64 == null ||
+        widget.assignment.photoAfterBase64 == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.assignment.photoBeforeBase64 == null &&
+                      widget.assignment.photoAfterBase64 == null
+                  ? 'Please upload both before and after photos first'
+                  : widget.assignment.photoBeforeBase64 == null
+                  ? 'Please upload before photo first'
+                  : 'Please upload after photo first',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
           ),
-          duration: Duration(seconds: 4),
-        ),
+        );
+      }
+      return;
+    }
+
+    // Both photos exist, mark as complete
+    try {
+      await context.read<TeamProvider>().submitProof(
+        widget.assignment.id,
+        widget.assignment.photoBeforeBase64!,
+        widget.assignment.photoAfterBase64!,
+        uid,
       );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Task marked as complete!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        // Navigate back to refresh the dashboard
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error completing task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -596,9 +660,10 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
       }
 
       if (context.mounted) {
+        // Only update the before photo field, not the entire document
         await context.read<TeamProvider>().updateTeamAssignment(
           widget.assignment.id,
-          widget.assignment.copyWith(photoBeforeBase64: compressedBase64).toFirestore(),
+          {'photoBeforeBase64': compressedBase64},
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -636,9 +701,10 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
       }
 
       if (context.mounted) {
+        // Only update the after photo field, not the entire document
         await context.read<TeamProvider>().updateTeamAssignment(
           widget.assignment.id,
-          widget.assignment.copyWith(photoAfterBase64: compressedBase64).toFirestore(),
+          {'photoAfterBase64': compressedBase64},
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -655,9 +721,13 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
   }
 
   /// Build proof photos section
-  Widget _buildProofPhotosSection(BuildContext context, String currentUserId) {
-    final isAssignedMember = widget.assignment.assignedToUid == currentUserId;
-    final canUpload = isAssignedMember && !widget.assignment.isCompleted;
+  Widget _buildProofPhotosSection(
+    BuildContext context,
+    String currentUserId,
+    TeamAssignmentModel assignment,
+  ) {
+    final isAssignedMember = assignment.assignedToUid == currentUserId;
+    final canUpload = isAssignedMember && !assignment.isCompleted;
 
     return Card(
       elevation: 2,
@@ -679,11 +749,11 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             const SizedBox(height: 8),
-            if (widget.assignment.photoBeforeBase64 != null)
+            if (assignment.photoBeforeBase64 != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.memory(
-                  base64Decode(widget.assignment.photoBeforeBase64!),
+                  base64Decode(assignment.photoBeforeBase64!),
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -708,7 +778,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                   onPressed: () => _uploadBeforePhoto(context),
                   icon: const Icon(Icons.camera_alt),
                   label: Text(
-                    widget.assignment.photoBeforeBase64 != null
+                    assignment.photoBeforeBase64 != null
                         ? 'Retake Before Photo'
                         : 'Take Before Photo',
                   ),
@@ -728,11 +798,11 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             const SizedBox(height: 8),
-            if (widget.assignment.photoAfterBase64 != null)
+            if (assignment.photoAfterBase64 != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.memory(
-                  base64Decode(widget.assignment.photoAfterBase64!),
+                  base64Decode(assignment.photoAfterBase64!),
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -757,7 +827,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                   onPressed: () => _uploadAfterPhoto(context),
                   icon: const Icon(Icons.camera_alt),
                   label: Text(
-                    widget.assignment.photoAfterBase64 != null
+                    assignment.photoAfterBase64 != null
                         ? 'Retake After Photo'
                         : 'Take After Photo',
                   ),

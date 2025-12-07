@@ -145,9 +145,52 @@ class _MyTeamsScreenState extends State<MyTeamsScreen> {
                               ),
                             ),
                             subtitle: Text('${team.memberIds.length} members'),
-                            trailing: const Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
+                            trailing: StreamBuilder<int>(
+                              stream: isOwner
+                                  ? context
+                                        .read<TeamProvider>()
+                                        .getUnviewedCountForTeam(team.id)
+                                  : context
+                                        .read<TeamProvider>()
+                                        .getUnviewedCountForMember(user.uid),
+                              builder: (context, snapshot) {
+                                final badgeCount = snapshot.data ?? 0;
+                                return Stack(
+                                  children: [
+                                    const Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 16,
+                                    ),
+                                    if (badgeCount > 0)
+                                      Positioned(
+                                        right: 0,
+                                        top: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 16,
+                                          ),
+                                          child: Text(
+                                            badgeCount > 9
+                                                ? '9+'
+                                                : '$badgeCount',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
                             ),
                             onTap: () {
                               Navigator.push(

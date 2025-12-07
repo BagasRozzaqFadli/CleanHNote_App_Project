@@ -35,6 +35,48 @@ class _AssignmentCardState extends State<AssignmentCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine if this task needs a badge
+    final showBadge = widget.isOwner
+        ? widget.task.needsOwnerReview
+        : widget.task.needsMemberReview;
+
+    // Determine status color and icon
+    Color statusColor;
+    IconData statusIcon;
+    String statusLabel;
+
+    if (widget.task.isCompleted) {
+      if (widget.task.wasCompletedLate) {
+        // Completed late
+        statusColor = Colors.orange;
+        statusIcon = Icons.done_outline;
+        statusLabel = 'Completed Late';
+      } else {
+        // Completed on time
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusLabel = 'Completed';
+      }
+    } else {
+      // Not completed
+      final now = DateTime.now();
+      final isOverdue =
+          widget.task.dueDateTime != null &&
+          now.isAfter(widget.task.dueDateTime!);
+
+      if (isOverdue) {
+        // Overdue and not done
+        statusColor = Colors.red;
+        statusIcon = Icons.warning;
+        statusLabel = 'Overdue';
+      } else {
+        // Pending
+        statusColor = Colors.blue;
+        statusIcon = Icons.pending_actions;
+        statusLabel = 'Pending';
+      }
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       elevation: 2,
@@ -49,14 +91,25 @@ class _AssignmentCardState extends State<AssignmentCard> {
               padding: const EdgeInsets.all(12.0),
               child: Row(
                 children: [
-                  // Status Icon
-                  Icon(
-                    widget.task.isCompleted
-                        ? Icons.check_circle
-                        : Icons.pending_actions,
-                    color: widget.task.isCompleted
-                        ? Colors.green
-                        : Colors.orange,
+                  // Status Icon with Badge
+                  Stack(
+                    children: [
+                      Icon(statusIcon, color: statusColor, size: 28),
+                      // Red badge for unviewed tasks
+                      if (showBadge)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: 12),
 
@@ -75,12 +128,52 @@ class _AssignmentCardState extends State<AssignmentCard> {
                                 : null,
                           ),
                         ),
-                        Text(
-                          'Status: ${widget.task.status}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: statusColor,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                            if (showBadge) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  widget.isOwner ? 'Review' : 'New',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
