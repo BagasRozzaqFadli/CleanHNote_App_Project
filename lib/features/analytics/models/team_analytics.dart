@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Team Analytics Model
 /// Represents analytics data for a team stored in Appwrite
 class TeamAnalytics {
@@ -52,7 +54,11 @@ class TeamAnalytics {
   factory TeamAnalytics.fromJson(Map<String, dynamic> json) {
     final membersMap = <String, MemberPerformance>{};
     if (json['members'] != null) {
-      final membersData = json['members'] as Map<String, dynamic>;
+      // Decode JSON string to Map
+      final membersData = json['members'] is String
+          ? jsonDecode(json['members']) as Map<String, dynamic>
+          : json['members'] as Map<String, dynamic>;
+
       membersData.forEach((key, value) {
         membersMap[key] = MemberPerformance.fromJson(value);
       });
@@ -60,7 +66,11 @@ class TeamAnalytics {
 
     final trends = <MonthlyTrend>[];
     if (json['monthlyTrends'] != null) {
-      final trendsData = json['monthlyTrends'] as List;
+      // Decode JSON string to List
+      final trendsData = json['monthlyTrends'] is String
+          ? jsonDecode(json['monthlyTrends']) as List
+          : json['monthlyTrends'] as List;
+
       trends.addAll(trendsData.map((item) => MonthlyTrend.fromJson(item)));
     }
 
@@ -99,8 +109,10 @@ class TeamAnalytics {
       'totalTasksLate': totalTasksLate,
       'totalTasksIncomplete': totalTasksIncomplete,
       'averageCompletionTimeHours': averageCompletionTimeHours,
-      'members': membersJson,
-      'monthlyTrends': monthlyTrends.map((t) => t.toJson()).toList(),
+      'members': jsonEncode(membersJson), // Convert to JSON string
+      'monthlyTrends': jsonEncode(
+        monthlyTrends.map((t) => t.toJson()).toList(),
+      ), // Convert to JSON string
     };
   }
 

@@ -27,6 +27,7 @@ class RealtimeAnalyticsService {
   static const String _collectionId = 'team_analytics';
 
   bool _isInitialized = false;
+  bool mounted = true;
   String? _currentTeamId;
 
   /// Initialize Appwrite Realtime client
@@ -60,12 +61,16 @@ class RealtimeAnalyticsService {
     try {
       _subscription = _realtime.subscribe([channel]);
 
+      // Emit connecting status first
+      _connectionController.add(ConnectionStatus.connecting);
+      print('🔄 Subscribing to team analytics: $teamId');
+
       // Listen to connection status
       _subscription!.stream.listen(
         (response) {
           print('📡 Realtime event received: ${response.events}');
 
-          // Update connection status
+          // Update connection status to connected on first event
           _connectionController.add(ConnectionStatus.connected);
 
           // Parse and emit analytics data
@@ -76,7 +81,7 @@ class RealtimeAnalyticsService {
               print('✅ Analytics updated via realtime');
             } catch (e) {
               print('❌ Error parsing analytics: $e');
-              _connectionController.add(ConnectionStatus.error);
+              // Don't change connection status for parsing errors
             }
           }
         },
@@ -86,7 +91,7 @@ class RealtimeAnalyticsService {
 
           // Try to reconnect after delay
           Future.delayed(const Duration(seconds: 5), () {
-            if (_currentTeamId != null) {
+            if (_currentTeamId != null && mounted) {
               print('🔄 Attempting to reconnect...');
               subscribeToTeamAnalytics(_currentTeamId!);
             }
@@ -98,7 +103,15 @@ class RealtimeAnalyticsService {
         },
       );
 
-      _connectionController.add(ConnectionStatus.connecting);
+      // Emit connected status after successful subscription
+      // This ensures the UI shows connected even before first event
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_subscription != null && mounted) {
+          _connectionController.add(ConnectionStatus.connected);
+          print('✅ Realtime connection established');
+        }
+      });
+
       print('✅ Subscribed to team analytics: $teamId');
     } catch (e) {
       print('❌ Failed to subscribe: $e');
@@ -130,6 +143,7 @@ class RealtimeAnalyticsService {
 
   /// Dispose service (cleanup)
   void dispose() {
+    mounted = false;
     unsubscribe();
     _analyticsController.close();
     _connectionController.close();

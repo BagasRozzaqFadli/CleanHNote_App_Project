@@ -23,6 +23,7 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
 
   TeamAnalytics? _analytics;
   bool _isLoading = true;
+  String? _errorMessage;
   ConnectionStatus _connectionStatus = ConnectionStatus.disconnected;
 
   @override
@@ -62,12 +63,32 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
   }
 
   Future<void> _loadAnalytics() async {
-    final analytics = await _analyticsService.getTeamAnalytics(widget.teamId);
-    if (mounted) {
-      setState(() {
-        _analytics = analytics;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final analytics = await _analyticsService.getTeamAnalytics(widget.teamId);
+
+      if (mounted) {
+        setState(() {
+          _analytics = analytics;
+          _isLoading = false;
+
+          if (analytics == null) {
+            _errorMessage = 'Could not load analytics data. Please try again.';
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading analytics: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error: ${e.toString()}';
+        });
+      }
     }
   }
 
@@ -174,6 +195,8 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+          ? _buildError()
           : _analytics == null
           ? _buildNoData()
           : _buildDashboard(),
@@ -199,6 +222,41 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
           Text(
             'Start assigning tasks to see analytics',
             style: TextStyle(color: Colors.grey[500]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 80, color: Colors.red[300]),
+          const SizedBox(height: 16),
+          Text(
+            'Error Loading Analytics',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              _errorMessage ?? 'An unknown error occurred',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _loadAnalytics,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
           ),
         ],
       ),
@@ -303,37 +361,52 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
   }
 
   Widget _buildOverviewCards() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 1.5,
+    return Column(
       children: [
-        _buildStatCard(
-          'Completion Rate',
-          '${_analytics!.completionRate.toStringAsFixed(1)}%',
-          Icons.check_circle_outline,
-          Colors.green,
+        // Row 1: Completion Rate & On-Time Rate
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Completion Rate',
+                '${_analytics!.completionRate.toStringAsFixed(1)}%',
+                Icons.check_circle_outline,
+                Colors.green,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                'On-Time Rate',
+                '${_analytics!.onTimeRate.toStringAsFixed(1)}%',
+                Icons.access_time,
+                Colors.blue,
+              ),
+            ),
+          ],
         ),
-        _buildStatCard(
-          'On-Time Rate',
-          '${_analytics!.onTimeRate.toStringAsFixed(1)}%',
-          Icons.access_time,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          'Avg Completion',
-          '${(_analytics!.averageCompletionTimeHours / 24).toStringAsFixed(1)}d',
-          Icons.speed,
-          Colors.orange,
-        ),
-        _buildStatCard(
-          'Total Tasks',
-          '${_analytics!.totalTasksAssigned}',
-          Icons.assignment,
-          Colors.purple,
+        const SizedBox(height: 12),
+        // Row 2: Avg Completion & Total Tasks
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Avg Completion',
+                '${(_analytics!.averageCompletionTimeHours / 24).toStringAsFixed(1)}d',
+                Icons.speed,
+                Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                'Total Tasks',
+                '${_analytics!.totalTasksAssigned}',
+                Icons.assignment,
+                Colors.purple,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -346,7 +419,7 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -358,33 +431,44 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const Spacer(),
-            ],
+          // Icon
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
+          const SizedBox(width: 12),
+          // Text
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
         ],
       ),
     );
