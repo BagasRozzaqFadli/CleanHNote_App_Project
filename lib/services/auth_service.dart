@@ -125,6 +125,37 @@ class AuthService {
         password: password,
       );
       AppLogger.log('Sign in successful for email: $email', tag: 'AuthService');
+
+      // Check if user is banned
+      try {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(result.user!.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final isBanned = userDoc.data()?['isBanned'] ?? false;
+          if (isBanned) {
+            // Sign out banned user immediately
+            await _auth.signOut();
+            AppLogger.log(
+              'Banned user attempted to sign in: $email',
+              tag: 'AuthService',
+            );
+            throw Exception(
+              'Your account has been banned. Please contact support.',
+            );
+          }
+        }
+      } catch (e) {
+        // If it's our ban exception, rethrow it
+        if (e.toString().contains('banned')) {
+          rethrow;
+        }
+        // Otherwise log and continue (don't block login if we can't check)
+        AppLogger.error('Error checking ban status: $e', tag: 'AuthService');
+      }
+
       return result;
     } catch (e, stack) {
       AppLogger.error(

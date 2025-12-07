@@ -690,6 +690,10 @@ class DatabaseService {
       print(
         'Maintenance completed: Deleted $deletedCount tasks, $notifDeletedCount notifications, Pruned $prunedCount images',
       );
+
+      // Check and downgrade expired premium users
+      await checkExpiredPremium();
+
       return MaintenanceResult(
         deletedTasks: deletedCount,
         prunedImages: prunedCount,
@@ -760,6 +764,96 @@ class DatabaseService {
     } catch (e) {
       print('Error getting user: $e');
       return null;
+    }
+  }
+
+  /// Ban user (Admin only)
+  Future<void> banUser(String uid) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({'isBanned': true});
+      print('✅ User $uid banned');
+    } catch (e) {
+      print('❌ Error banning user: $e');
+      rethrow;
+    }
+  }
+
+  /// Unban user (Admin only)
+  Future<void> unbanUser(String uid) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({'isBanned': false});
+      print('✅ User $uid unbanned');
+    } catch (e) {
+      print('❌ Error unbanning user: $e');
+      rethrow;
+    }
+  }
+
+  /// Upgrade user to premium with expiry (Admin only)
+  /// @param durationMonths - number of months to add (1, 3, or 12)
+  Future<void> upgradeToPremium(String uid, int durationMonths) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      final user = UserModel.fromFirestore(userDoc);
+
+      final now = DateTime.now();
+      final currentExpiry = user.premiumExpiresAt;
+
+      // Calculate new expiry date
+      final DateTime newExpiry;
+      if (currentExpiry != null && currentExpiry.isAfter(now)) {
+        // Extend from current expiry if still valid
+        newExpiry = DateTime(
+          currentExpiry.year,
+          currentExpiry.month + durationMonths,
+          currentExpiry.day,
+        );
+      } else {
+        // Start from now if no valid expiry
+        newExpiry = DateTime(now.year, now.month + durationMonths, now.day);
+      }
+
+      await _firestore.collection('users').doc(uid).update({
+        'role': 'premium',
+        'premiumExpiresAt': Timestamp.fromDate(newExpiry),
+      });
+
+      print('✅ User $uid upgraded to premium until ${newExpiry.toString()}');
+    } catch (e) {
+      print('❌ Error upgrading to premium: $e');
+      rethrow;
+    }
+  }
+
+  /// Check and downgrade expired premium users (called in maintenance)
+  Future<void> checkExpiredPremium() async {
+    try {
+      final now = DateTime.now();
+
+      final expiredUsersQuery = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'premium')
+          .where('premiumExpiresAt', isLessThan: Timestamp.fromDate(now))
+          .get();
+
+      if (expiredUsersQuery.docs.isEmpty) {
+        print('ℹ️ No expired premium users found');
+        return;
+      }
+
+      print('🔄 Found ${expiredUsersQuery.docs.length} expired premium users');
+
+      final batch = _firestore.batch();
+      for (var doc in expiredUsersQuery.docs) {
+        batch.update(doc.reference, {'role': 'free'});
+      }
+
+      await batch.commit();
+      print(
+        '✅ Downgraded ${expiredUsersQuery.docs.length} expired premium users',
+      );
+    } catch (e) {
+      print('❌ Error checking expired premium: $e');
     }
   }
 }

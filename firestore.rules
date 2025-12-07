@@ -51,19 +51,23 @@ service cloud.firestore {
       // Update: Allow if user owns document AND not trying to escalate to admin
       // Allow username updates
       // ALSO allow team owner to update joinedTeamIds (for kicking members)
-      allow update: if (isOwner(userId) && 
-                       (!isRoleChangeAttempt() || 
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username'])) &&
-                       !(request.resource.data.role == 'admin' && resource.data.role != 'admin') &&
-                       // Enforce team limits: Free (3), Premium (15)
-                       (
-                         !request.resource.data.keys().hasAny(['joinedTeamIds']) ||
-                         request.resource.data.joinedTeamIds.size() <= (resource.data.role == 'premium' ? 15 : 3)
-                       )) ||
-                       // OR allow if a team owner is removing this user from joinedTeamIds (kicking)
-                       (isAuthenticated() &&
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedTeamIds']) &&
-                        request.resource.data.joinedTeamIds.size() == resource.data.joinedTeamIds.size() - 1);
+      // ADMIN: Allow admin to update role, isBanned, premiumExpiresAt
+      allow update: if (isAdmin() && 
+                       request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['role', 'isBanned', 'premiumExpiresAt'])) ||
+                       (isOwner(userId) && 
+                        (!isRoleChangeAttempt() || 
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username'])) &&
+                        !(request.resource.data.role == 'admin' && resource.data.role != 'admin') &&
+                        // Enforce team limits: Free (3), Premium (15)
+                        (
+                          !request.resource.data.keys().hasAny(['joinedTeamIds']) ||
+                          request.resource.data.joinedTeamIds.size() <= (resource.data.role == 'premium' ? 15 : 3)
+                        )) ||
+                        // OR allow if a team owner is removing this user from joinedTeamIds (kicking)
+                        (isAuthenticated() &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedTeamIds']) &&
+                         request.resource.data.joinedTeamIds.size() == resource.data.joinedTeamIds.size() - 1);
       
       // Delete: Allow if user owns document
       

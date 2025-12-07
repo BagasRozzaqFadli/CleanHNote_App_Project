@@ -9,6 +9,9 @@ class UserModel {
   final String tenantId; // 6-character alphanumeric for admin search
   final List<String> joinedTeamIds; // IDs of teams user has joined
   final DateTime createdAt;
+  final DateTime? premiumExpiresAt; // When premium subscription expires
+  final bool isBanned; // Whether user is banned by admin
+  final DateTime? firstLoginAt; // When user first logged in
 
   UserModel({
     required this.uid,
@@ -18,6 +21,9 @@ class UserModel {
     required this.tenantId,
     this.joinedTeamIds = const [],
     required this.createdAt,
+    this.premiumExpiresAt,
+    this.isBanned = false,
+    this.firstLoginAt,
   });
 
   /// Convert from Firestore document
@@ -32,6 +38,9 @@ class UserModel {
       tenantId: data['tenantId'] ?? '',
       joinedTeamIds: List<String>.from(data['joinedTeamIds'] ?? []),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      premiumExpiresAt: (data['premiumExpiresAt'] as Timestamp?)?.toDate(),
+      isBanned: data['isBanned'] ?? false,
+      firstLoginAt: (data['firstLoginAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -51,6 +60,13 @@ class UserModel {
       'tenantId': tenantId,
       'joinedTeamIds': joinedTeamIds,
       'createdAt': Timestamp.fromDate(createdAt),
+      'premiumExpiresAt': premiumExpiresAt != null
+          ? Timestamp.fromDate(premiumExpiresAt!)
+          : null,
+      'isBanned': isBanned,
+      'firstLoginAt': firstLoginAt != null
+          ? Timestamp.fromDate(firstLoginAt!)
+          : null,
     };
   }
 
@@ -69,8 +85,12 @@ class UserModel {
     return result;
   }
 
-  /// Check if user has premium access
-  bool get isPremium => role == 'premium';
+  /// Check if user has premium access (and not expired)
+  bool get isPremium {
+    if (role != 'premium') return false;
+    if (premiumExpiresAt == null) return true; // Legacy premium users
+    return premiumExpiresAt!.isAfter(DateTime.now());
+  }
 
   /// Check if user is admin
   bool get isAdmin => role == 'admin';
@@ -87,6 +107,9 @@ class UserModel {
     String? tenantId,
     List<String>? joinedTeamIds,
     DateTime? createdAt,
+    DateTime? premiumExpiresAt,
+    bool? isBanned,
+    DateTime? firstLoginAt,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -96,6 +119,9 @@ class UserModel {
       tenantId: tenantId ?? this.tenantId,
       joinedTeamIds: joinedTeamIds ?? this.joinedTeamIds,
       createdAt: createdAt ?? this.createdAt,
+      premiumExpiresAt: premiumExpiresAt ?? this.premiumExpiresAt,
+      isBanned: isBanned ?? this.isBanned,
+      firstLoginAt: firstLoginAt ?? this.firstLoginAt,
     );
   }
 }

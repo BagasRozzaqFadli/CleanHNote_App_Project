@@ -9,7 +9,7 @@ import 'models/user_model.dart';
 import 'screens/login_screen.dart';
 import 'screens/free_dashboard_screen.dart';
 import 'screens/premium_dashboard_screen.dart';
-import 'screens/admin_dashboard_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
 import 'utils/logger.dart';
 import 'theme/app_theme.dart';
 import 'providers/task_provider.dart';
