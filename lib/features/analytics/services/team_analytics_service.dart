@@ -1,4 +1,5 @@
 import 'package:appwrite/appwrite.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/team_analytics.dart';
 
 /// Service for managing team analytics in Appwrite
@@ -393,6 +394,7 @@ class TeamAnalyticsService {
   }
 
   /// Get team analytics
+  /// Auto-initializes if analytics document doesn't exist
   Future<TeamAnalytics?> getTeamAnalytics(String teamId) async {
     try {
       await _ensureSession();
@@ -405,6 +407,48 @@ class TeamAnalyticsService {
 
       return TeamAnalytics.fromJson(doc.data);
     } catch (e) {
+      // Check if document doesn't exist (404 error)
+      if (e.toString().contains('404') || e.toString().contains('not found')) {
+        print('⚠️ Analytics not found for team $teamId, initializing...');
+
+        // Try to get team info from Firestore to initialize analytics
+        try {
+          final teamDoc = await FirebaseFirestore.instance
+              .collection('teams')
+              .doc(teamId)
+              .get();
+
+          if (teamDoc.exists) {
+            final teamData = teamDoc.data()!;
+            final teamName = teamData['name'] ?? 'Unknown Team';
+            final ownerId = teamData['ownerId'] ?? '';
+
+            // Initialize analytics
+            await initializeTeamAnalytics(
+              teamId: teamId,
+              teamName: teamName,
+              ownerId: ownerId,
+            );
+
+            // Fetch the newly created analytics
+            final newDoc = await _databases.getDocument(
+              databaseId: _databaseId,
+              collectionId: _collectionId,
+              documentId: teamId,
+            );
+
+            print('✅ Analytics initialized and fetched successfully');
+            return TeamAnalytics.fromJson(newDoc.data);
+          } else {
+            print('❌ Team $teamId not found in Firestore');
+            return null;
+          }
+        } catch (initError) {
+          print('❌ Failed to auto-initialize analytics: $initError');
+          return null;
+        }
+      }
+
       print('❌ Failed to get team analytics: $e');
       return null;
     }

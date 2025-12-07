@@ -374,19 +374,32 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
   }
 
   Widget _buildMembersTab(String currentUid, TeamModel team, bool isOwner) {
-    return ListView.builder(
-      itemCount: team.memberIds.length,
-      itemBuilder: (context, index) {
-        final memberId = team.memberIds[index];
-        return FutureBuilder<UserModel?>(
-          future: context.read<TeamProvider>().getUser(memberId),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const ListTile(title: Text('Loading...'));
-            }
-            final member = snapshot.data!;
+    // Optimization: Fetch all members at once using Future.wait
+    return FutureBuilder<List<UserModel?>>(
+      future: Future.wait(
+        team.memberIds.map((id) => context.read<TeamProvider>().getUser(id)),
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final members = (snapshot.data ?? []).whereType<UserModel>().toList();
+
+        if (members.isEmpty) {
+          return const Center(child: Text('No members found'));
+        }
+
+        return ListView.builder(
+          itemCount: members.length,
+          itemBuilder: (context, index) {
+            final member = members[index];
             final isMe = member.uid == currentUid;
             final isMemberOwner = team.isOwner(member.uid);
+
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               elevation: 1,

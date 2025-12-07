@@ -341,50 +341,8 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
                     ),
                     const SizedBox(height: 8),
 
-                    // Member List
-                    ...widget.team.memberIds.map((memberId) {
-                      return FutureBuilder<UserModel?>(
-                        future: context.read<TeamProvider>().getUser(memberId),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return const SizedBox.shrink();
-                          }
-
-                          final member = snapshot.data!;
-                          final isSelected = _selectedMemberId == memberId;
-
-                          return Card(
-                            elevation: isSelected ? 4 : 1,
-                            color: isSelected ? Colors.blue[50] : null,
-                            child: RadioListTile<String>(
-                              value: memberId,
-                              groupValue: _selectedMemberId,
-                              onChanged: (value) {
-                                setState(() => _selectedMemberId = value);
-                              },
-                              title: Text(
-                                member.username,
-                                style: TextStyle(
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                              subtitle: Text(member.email),
-                              secondary: CircleAvatar(
-                                backgroundColor: isSelected
-                                    ? Colors.blue[700]
-                                    : Colors.grey[400],
-                                child: Text(
-                                  member.username[0].toUpperCase(),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }),
+                    // Modern Member Selector Card
+                    _buildMemberSelector(),
 
                     const SizedBox(height: 24),
 
@@ -427,6 +385,219 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMemberSelector() {
+    return FutureBuilder<UserModel?>(
+      future: _selectedMemberId != null
+          ? context.read<TeamProvider>().getUser(_selectedMemberId!)
+          : Future.value(null),
+      builder: (context, snapshot) {
+        final selectedUser = snapshot.data;
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.blue.shade100),
+          ),
+          child: InkWell(
+            onTap: _showMemberSelectionDialog,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: selectedUser != null
+                          ? Colors.blue.shade100
+                          : Colors.grey.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.person_outline_rounded,
+                      color: selectedUser != null
+                          ? Colors.blue.shade700
+                          : Colors.grey.shade600,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          selectedUser != null
+                              ? selectedUser.username
+                              : 'Select Team Member',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: selectedUser != null
+                                ? Colors.black87
+                                : Colors.grey.shade600,
+                          ),
+                        ),
+                        if (selectedUser != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedUser.email,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Colors.grey.shade400,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showMemberSelectionDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Select Member'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search member...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setStateDialog(() {
+                          searchQuery = value.toLowerCase();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Flexible(
+                      child: FutureBuilder<List<UserModel?>>(
+                        future: Future.wait(
+                          widget.team.memberIds.map(
+                            (id) => context.read<TeamProvider>().getUser(id),
+                          ),
+                        ),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          var members = (snapshot.data ?? [])
+                              .whereType<UserModel>()
+                              .toList();
+
+                          if (searchQuery.isNotEmpty) {
+                            members = members.where((m) {
+                              return m.username
+                                      .toLowerCase()
+                                      .contains(searchQuery) ||
+                                  m.email.toLowerCase().contains(searchQuery);
+                            }).toList();
+                          }
+
+                          if (members.isEmpty) {
+                            return const Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Text('No members found'),
+                            );
+                          }
+
+                          return ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: members.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(),
+                            itemBuilder: (context, index) {
+                              final member = members[index];
+                              final isSelected =
+                                  _selectedMemberId == member.uid;
+
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.blue.shade100,
+                                  child: Text(
+                                    member.username.isNotEmpty
+                                        ? member.username[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: Colors.blue.shade800,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  member.username,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(member.email),
+                                trailing: isSelected
+                                    ? const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                      )
+                                    : null,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedMemberId = member.uid;
+                                  });
+                                  Navigator.pop(context);
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
