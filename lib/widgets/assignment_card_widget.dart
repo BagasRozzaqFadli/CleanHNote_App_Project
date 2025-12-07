@@ -3,6 +3,7 @@ import '../models/team_assignment_model.dart';
 import '../screens/team_task_detail_screen.dart';
 import '../services/image_helper.dart';
 import '../services/appwrite_service.dart';
+import '../widgets/full_screen_image_viewer.dart';
 
 class AssignmentCard extends StatefulWidget {
   final TeamAssignmentModel task;
@@ -295,15 +296,28 @@ class _AssignmentCardState extends State<AssignmentCard> {
         children: [
           Text(label, style: const TextStyle(fontSize: 10)),
           const SizedBox(height: 4),
-          AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.memory(
-                ImageHelper.decodeBase64(base64)!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.broken_image),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => FullScreenImageViewer(
+                    base64Image: base64,
+                    title: '$label Photo',
+                  ),
+                ),
+              );
+            },
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  ImageHelper.decodeBase64(base64)!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.broken_image),
+                ),
               ),
             ),
           ),

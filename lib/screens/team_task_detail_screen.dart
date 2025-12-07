@@ -12,6 +12,7 @@ import '../models/team_assignment_model.dart';
 import '../services/auth_service.dart';
 import '../providers/team_provider.dart';
 import '../widgets/countdown_badge.dart';
+import '../widgets/full_screen_image_viewer.dart';
 import 'edit_team_task_screen.dart';
 
 /// Detail screen for team assignments with full operations
@@ -725,13 +726,26 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 if (beforePhotoBase64 != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      base64Decode(beforePhotoBase64),
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FullScreenImageViewer(
+                            base64Image: beforePhotoBase64,
+                            title: 'Before Photo',
+                          ),
+                        ),
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(
+                        base64Decode(beforePhotoBase64),
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   )
                 else
@@ -771,13 +785,26 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 if (afterPhotoBase64 != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      base64Decode(afterPhotoBase64),
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FullScreenImageViewer(
+                            base64Image: afterPhotoBase64,
+                            title: 'After Photo',
+                          ),
+                        ),
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(
+                        base64Decode(afterPhotoBase64),
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   )
                 else
