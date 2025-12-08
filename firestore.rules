@@ -183,7 +183,7 @@ service cloud.firestore {
                        (isAuthenticated() &&
                         resource.data.assignedToUid == request.auth.uid &&
                         isStillTeamMember() &&
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'viewedByMember']) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'viewedByMember', 'lateMarkedAt']) &&
                         request.resource.data.status == 'late') ||
                        // Allow owner to mark as viewed (for both viewedByOwner and viewedByMember)
                        (isAuthenticated() &&
