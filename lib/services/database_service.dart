@@ -290,6 +290,8 @@ class DatabaseService {
           batch.update(assignmentDoc.reference, {
             'status': 'late', // Mark as late/overdue (triggers auto-delete)
             'viewedByMember': true, // Remove badge
+            'lateMarkedAt':
+                FieldValue.serverTimestamp(), // Track when became late
           });
         }
         await batch.commit();
@@ -520,6 +522,8 @@ class DatabaseService {
           batch.update(assignmentDoc.reference, {
             'status': 'late', // Mark as late/overdue (triggers auto-delete)
             'viewedByMember': true, // Remove badge
+            'lateMarkedAt':
+                FieldValue.serverTimestamp(), // Track when became late
           });
         }
         await batch.commit();

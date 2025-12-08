@@ -60,22 +60,29 @@ class _AssignmentCardState extends State<AssignmentCard> {
         statusLabel = 'Completed';
       }
     } else {
-      // Not completed
-      final now = DateTime.now();
-      final isOverdue =
-          widget.task.dueDateTime != null &&
-          now.isAfter(widget.task.dueDateTime!);
-
-      if (isOverdue) {
-        // Overdue and not done
-        statusColor = Colors.red;
-        statusIcon = Icons.warning;
-        statusLabel = 'Overdue';
+      // Not completed - check for 'late' status FIRST
+      if (widget.task.status == 'late') {
+        // Left behind (user left team or was kicked)
+        statusColor = Colors.orange;
+        statusIcon = Icons.exit_to_app;
+        statusLabel = 'Tertinggal';
       } else {
-        // Pending
-        statusColor = Colors.blue;
-        statusIcon = Icons.pending_actions;
-        statusLabel = 'Pending';
+        final now = DateTime.now();
+        final isOverdue =
+            widget.task.dueDateTime != null &&
+            now.isAfter(widget.task.dueDateTime!);
+
+        if (isOverdue) {
+          // Overdue and not done
+          statusColor = Colors.red;
+          statusIcon = Icons.warning;
+          statusLabel = 'Overdue';
+        } else {
+          // Pending
+          statusColor = Colors.blue;
+          statusIcon = Icons.pending_actions;
+          statusLabel = 'Pending';
+        }
       }
     }
 

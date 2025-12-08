@@ -148,6 +148,8 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                     gradient: LinearGradient(
                       colors: assignment.isCompleted
                           ? [Colors.green[400]!, Colors.green[600]!]
+                          : assignment.status == 'late'
+                          ? [Colors.orange[400]!, Colors.orange[600]!]
                           : isOverdue
                           ? [Colors.red[400]!, Colors.red[600]!]
                           : [Colors.indigo[400]!, Colors.indigo[600]!],
@@ -184,10 +186,11 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                       Text(
                         assignment.isCompleted
                             ? 'Completed'
+                            : assignment.status ==
+                                  'late' // Check 'late' FIRST
+                            ? 'Tertinggal'
                             : isOverdue
                             ? 'Overdue!'
-                            : assignment.status == 'late'
-                            ? 'Tertinggal'
                             : assignment.status == 'in_progress'
                             ? 'In Progress'
                             : 'Pending',
@@ -263,8 +266,9 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                // Countdown to start
-                                if (isFuture) ...[
+                                // Countdown to start (hide if status is 'late')
+                                if (isFuture &&
+                                    assignment.status != 'late') ...[
                                   _buildCountdownItem(
                                     context,
                                     'Time until task starts',
@@ -276,7 +280,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                                   const SizedBox(height: 8),
                                 ],
                                 // Countdown to deletion
-                                if (widget.assignment.timeUntilDeletion != null)
+                                if (assignment.timeUntilDeletion != null)
                                   CountdownBadge(
                                     timeUntilDeletion:
                                         assignment.timeUntilDeletion,

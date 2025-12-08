@@ -27,6 +27,8 @@ class TeamAssignmentModel {
   final DateTime createdAt;
   final bool viewedByOwner; // Has owner viewed completed/overdue task
   final bool viewedByMember; // Has member viewed new assignment
+  final DateTime?
+  lateMarkedAt; // When status was changed to 'late' (user left/kicked)
 
   TeamAssignmentModel({
     required this.id,
@@ -47,6 +49,7 @@ class TeamAssignmentModel {
     required this.createdAt,
     this.viewedByOwner = false,
     this.viewedByMember = false,
+    this.lateMarkedAt,
   });
 
   /// Convert from Firestore document
@@ -84,6 +87,7 @@ class TeamAssignmentModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       viewedByOwner: data['viewedByOwner'] ?? false,
       viewedByMember: data['viewedByMember'] ?? false,
+      lateMarkedAt: (data['lateMarkedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -140,13 +144,18 @@ class TeamAssignmentModel {
     return DateTime.now().difference(completedAt!).inDays > 7;
   }
 
-  /// Check if task should be deleted (completed OR overdue for 7+ days)
+  /// Check if task should be deleted (completed OR overdue OR late for 7+ days)
   bool get shouldBeDeleted {
     final now = DateTime.now();
 
     // Delete if task is COMPLETED for 7+ days
     if (status == 'done' && completedAt != null) {
       return now.difference(completedAt!).inDays > 7;
+    }
+
+    // OR delete if task is LATE (left/kicked) for 7+ days
+    if (status == 'late' && lateMarkedAt != null) {
+      return now.difference(lateMarkedAt!).inDays > 7;
     }
 
     // OR delete if task is OVERDUE (not completed) for 7+ days
@@ -178,6 +187,13 @@ class TeamAssignmentModel {
         final remaining = deletionDate.difference(now);
         if (!remaining.isNegative) return remaining;
       }
+    }
+
+    // OR show countdown if status is 'late' (user left/kicked - 7 days from lateMarkedAt)
+    if (status == 'late' && lateMarkedAt != null) {
+      final deletionDate = lateMarkedAt!.add(const Duration(days: 7));
+      final remaining = deletionDate.difference(now);
+      if (!remaining.isNegative) return remaining;
     }
 
     return null;
@@ -225,6 +241,11 @@ class TeamAssignmentModel {
     // Overdue and not completed
     if (status != 'done' && dueDateTime != null && now.isAfter(dueDateTime!)) {
       return 'This task will be permanently deleted in ${timeUntilDeletion!.inDays} days because it is overdue and not completed.';
+    }
+
+    // Left/kicked from team
+    if (status == 'late' && lateMarkedAt != null) {
+      return 'This task will be permanently deleted in ${timeUntilDeletion!.inDays} days because you left or were removed from the team.';
     }
 
     return 'This task will be automatically deleted soon.';
@@ -297,6 +318,7 @@ class TeamAssignmentModel {
       createdAt: createdAt ?? this.createdAt,
       viewedByOwner: viewedByOwner ?? this.viewedByOwner,
       viewedByMember: viewedByMember ?? this.viewedByMember,
+      lateMarkedAt: this.lateMarkedAt, // Don't allow modification
     );
   }
 }
