@@ -244,36 +244,15 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
           ),
         ),
       ),
-      // TEMPORARY: Cleanup button - REVERT TO CREATE TASK AFTER CLEANUP!
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          try {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('🧹 Starting cleanup...')),
-            );
-            await context.read<TeamProvider>().cleanupOrphanedTeamIds();
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('✅ Cleanup selesai! Cek console untuk detail.'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('❌ Error: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          }
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CreateTaskScreen()),
+          );
         },
-        backgroundColor: Colors.orange,
-        icon: const Icon(Icons.cleaning_services),
-        label: const Text('CLEANUP'),
+        backgroundColor: Colors.indigo[700],
+        child: const Icon(Icons.add),
       ),
     );
   }

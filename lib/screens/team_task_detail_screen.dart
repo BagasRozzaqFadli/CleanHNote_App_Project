@@ -186,6 +186,8 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
                             ? 'Completed'
                             : isOverdue
                             ? 'Overdue!'
+                            : assignment.status == 'late'
+                            ? 'Tertinggal'
                             : assignment.status == 'in_progress'
                             ? 'In Progress'
                             : 'Pending',
@@ -380,25 +382,50 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
             ),
           ),
           bottomNavigationBar: !assignment.isCompleted
-              ? SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: ElevatedButton.icon(
-                      onPressed: () =>
-                          _completeAssignment(context, user?.uid ?? ''),
-                      icon: const Icon(Icons.check),
-                      label: const Text('Mark as Complete'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+              ? FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('teams')
+                      .doc(assignment.teamId)
+                      .get(),
+                  builder: (context, teamSnapshot) {
+                    // Check if user is still a team member
+                    bool isStillMember = false;
+                    if (teamSnapshot.hasData && teamSnapshot.data!.exists) {
+                      final teamData =
+                          teamSnapshot.data!.data() as Map<String, dynamic>;
+                      final memberIds = List<String>.from(
+                        teamData['memberIds'] ?? [],
+                      );
+                      isStillMember = memberIds.contains(user?.uid);
+                    }
+
+                    // Only show if user is assigned AND still in team
+                    final canComplete =
+                        assignment.assignedToUid == user?.uid && isStillMember;
+
+                    if (!canComplete) return const SizedBox.shrink();
+
+                    return SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: ElevatedButton.icon(
+                          onPressed: () =>
+                              _completeAssignment(context, user?.uid ?? ''),
+                          icon: const Icon(Icons.check),
+                          label: const Text('Mark as Complete'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 )
               : null,
         );
@@ -691,154 +718,183 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
   /// Build proof photos section (retrieves from Appwrite, falls back to Firestore)
   Widget _buildProofPhotosSection(BuildContext context, String currentUserId) {
     final isAssignedMember = widget.assignment.assignedToUid == currentUserId;
-    final canUpload = isAssignedMember && !widget.assignment.isCompleted;
 
-    return FutureBuilder<Map<String, String?>>(
-      future: AppwriteService().getBothPhotos(widget.assignment.id),
-      builder: (context, snapshot) {
-        // Get photos from Appwrite or fallback to Firestore
-        final beforePhotoBase64 =
-            snapshot.hasData && snapshot.data!['before'] != null
-            ? snapshot.data!['before']
-            : widget.assignment.photoBeforeBase64;
-        final afterPhotoBase64 =
-            snapshot.hasData && snapshot.data!['after'] != null
-            ? snapshot.data!['after']
-            : widget.assignment.photoAfterBase64;
+    // Check team membership FIRST
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('teams')
+          .doc(widget.assignment.teamId)
+          .get(),
+      builder: (context, teamSnapshot) {
+        // Check if user is still a team member
+        bool isStillMember = false;
+        if (teamSnapshot.hasData && teamSnapshot.data!.exists) {
+          final teamData = teamSnapshot.data!.data() as Map<String, dynamic>;
+          final memberIds = List<String>.from(teamData['memberIds'] ?? []);
+          isStillMember = memberIds.contains(currentUserId);
+        }
 
-        return Card(
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '📸 Proof of Work',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Divider(),
-                const SizedBox(height: 8),
-                // Before Photo
-                const Text(
-                  'Before Photo:',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                if (beforePhotoBase64 != null)
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FullScreenImageViewer(
-                            base64Image: beforePhotoBase64,
-                            title: 'Before Photo',
+        // User can upload ONLY if assigned AND still member AND not completed
+        final canUpload =
+            isAssignedMember && isStillMember && !widget.assignment.isCompleted;
+
+        return FutureBuilder<Map<String, String?>>(
+          future: AppwriteService().getBothPhotos(widget.assignment.id),
+          builder: (context, snapshot) {
+            // Get photos from Appwrite or fallback to Firestore
+            final beforePhotoBase64 =
+                snapshot.hasData && snapshot.data!['before'] != null
+                ? snapshot.data!['before']
+                : widget.assignment.photoBeforeBase64;
+            final afterPhotoBase64 =
+                snapshot.hasData && snapshot.data!['after'] != null
+                ? snapshot.data!['after']
+                : widget.assignment.photoAfterBase64;
+
+            return Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '📸 Proof of Work',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    // Before Photo
+                    const Text(
+                      'Before Photo:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (beforePhotoBase64 != null)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FullScreenImageViewer(
+                                base64Image: beforePhotoBase64,
+                                title: 'Before Photo',
+                              ),
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            base64Decode(beforePhotoBase64),
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                      );
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        base64Decode(beforePhotoBase64),
+                      )
+                    else
+                      Container(
                         height: 200,
                         width: double.infinity,
-                        fit: BoxFit.cover,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(child: Text('No before photo yet')),
                       ),
-                    ),
-                  )
-                else
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(child: Text('No before photo yet')),
-                  ),
-                if (canUpload) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _uploadBeforePhoto(context),
-                      icon: const Icon(Icons.camera_alt),
-                      label: Text(
-                        beforePhotoBase64 != null
-                            ? 'Retake Before Photo'
-                            : 'Take Before Photo',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                // After Photo
-                const Text(
-                  'After Photo:',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                if (afterPhotoBase64 != null)
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FullScreenImageViewer(
-                            base64Image: afterPhotoBase64,
-                            title: 'After Photo',
+                    if (canUpload) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _uploadBeforePhoto(context),
+                          icon: const Icon(Icons.camera_alt),
+                          label: Text(
+                            beforePhotoBase64 != null
+                                ? 'Retake Before Photo'
+                                : 'Take Before Photo',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
                           ),
                         ),
-                      );
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        base64Decode(afterPhotoBase64),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    // After Photo
+                    const Text(
+                      'After Photo:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (afterPhotoBase64 != null)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FullScreenImageViewer(
+                                base64Image: afterPhotoBase64,
+                                title: 'After Photo',
+                              ),
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            base64Decode(afterPhotoBase64),
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
                         height: 200,
                         width: double.infinity,
-                        fit: BoxFit.cover,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(child: Text('No after photo yet')),
                       ),
-                    ),
-                  )
-                else
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(child: Text('No after photo yet')),
-                  ),
-                if (canUpload) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _uploadAfterPhoto(context),
-                      icon: const Icon(Icons.camera_alt),
-                      label: Text(
-                        afterPhotoBase64 != null
-                            ? 'Retake After Photo'
-                            : 'Take After Photo',
+                    if (canUpload) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _uploadAfterPhoto(context),
+                          icon: const Icon(Icons.camera_alt),
+                          label: Text(
+                            afterPhotoBase64 != null
+                                ? 'Retake After Photo'
+                                : 'Take After Photo',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );

@@ -275,18 +275,8 @@ class DatabaseService {
         throw Exception('Owner cannot leave team. Delete team instead.');
       }
 
-      // Remove user from team
-      await teamDoc.reference.update({
-        'memberIds': FieldValue.arrayRemove([userId]),
-      });
-
-      // Remove from user's joinedTeamIds
-      await _firestore.collection('users').doc(userId).update({
-        'joinedTeamIds': FieldValue.arrayRemove([teamId]),
-      });
-
-      // CRITICAL: Mark all incomplete assignments as viewed
-      // This prevents ghost badges for assignments from teams user has left
+      // CRITICAL: Mark all incomplete assignments as late FIRST
+      // Must do this BEFORE removing user from team (for firestore rules)
       final assignmentsSnapshot = await _firestore
           .collection('team_assignments')
           .where('teamId', isEqualTo: teamId)
@@ -298,16 +288,25 @@ class DatabaseService {
         final batch = _firestore.batch();
         for (final assignmentDoc in assignmentsSnapshot.docs) {
           batch.update(assignmentDoc.reference, {
-            'viewedByMember': true,
-            // Optionally mark as failed/cancelled
-            // 'status': 'cancelled',
+            'status': 'late', // Mark as late/overdue (triggers auto-delete)
+            'viewedByMember': true, // Remove badge
           });
         }
         await batch.commit();
         print(
-          '✅ Marked ${assignmentsSnapshot.docs.length} assignments as viewed for user leaving team',
+          '✅ Marked ${assignmentsSnapshot.docs.length} assignments as late (orphaned)',
         );
       }
+
+      // NOW remove user from team (after assignments updated)
+      await teamDoc.reference.update({
+        'memberIds': FieldValue.arrayRemove([userId]),
+      });
+
+      // Remove from user's joinedTeamIds
+      await _firestore.collection('users').doc(userId).update({
+        'joinedTeamIds': FieldValue.arrayRemove([teamId]),
+      });
     } catch (e) {
       rethrow;
     }
@@ -506,18 +505,8 @@ class DatabaseService {
         throw Exception('Cannot kick owner');
       }
 
-      // Remove member from team
-      await teamDoc.reference.update({
-        'memberIds': FieldValue.arrayRemove([memberId]),
-      });
-
-      // Remove from member's joinedTeamIds
-      await _firestore.collection('users').doc(memberId).update({
-        'joinedTeamIds': FieldValue.arrayRemove([teamId]),
-      });
-
-      // CRITICAL: Mark all incomplete assignments as viewed
-      // This prevents ghost badges for kicked members
+      // CRITICAL: Mark all incomplete assignments as late FIRST
+      // Must do this BEFORE removing member from team (for firestore rules)
       final assignmentsSnapshot = await _firestore
           .collection('team_assignments')
           .where('teamId', isEqualTo: teamId)
@@ -528,13 +517,26 @@ class DatabaseService {
       if (assignmentsSnapshot.docs.isNotEmpty) {
         final batch = _firestore.batch();
         for (final assignmentDoc in assignmentsSnapshot.docs) {
-          batch.update(assignmentDoc.reference, {'viewedByMember': true});
+          batch.update(assignmentDoc.reference, {
+            'status': 'late', // Mark as late/overdue (triggers auto-delete)
+            'viewedByMember': true, // Remove badge
+          });
         }
         await batch.commit();
         print(
-          '✅ Marked ${assignmentsSnapshot.docs.length} assignments as viewed for kicked member',
+          '✅ Marked ${assignmentsSnapshot.docs.length} assignments as late (orphaned)',
         );
       }
+
+      // NOW remove member from team (after assignments updated)
+      await teamDoc.reference.update({
+        'memberIds': FieldValue.arrayRemove([memberId]),
+      });
+
+      // Remove from member's joinedTeamIds
+      await _firestore.collection('users').doc(memberId).update({
+        'joinedTeamIds': FieldValue.arrayRemove([teamId]),
+      });
     } catch (e) {
       rethrow;
     }
@@ -665,6 +667,26 @@ class DatabaseService {
 
       if (assignment.assignedToUid != uid) {
         throw Exception('Unauthorized: Not your assignment');
+      }
+
+      // CRITICAL: Check if user is still a member of the team
+      // Users who left or were kicked cannot submit proof
+      final teamDoc = await _firestore
+          .collection('teams')
+          .doc(assignment.teamId)
+          .get();
+
+      if (!teamDoc.exists) {
+        throw Exception('Team tidak ditemukan');
+      }
+
+      final teamData = teamDoc.data()!;
+      final memberIds = List<String>.from(teamData['memberIds'] ?? []);
+
+      if (!memberIds.contains(uid)) {
+        throw Exception(
+          'Anda sudah tidak di team ini. Tidak dapat submit proof.',
+        );
       }
 
       await docRef.update({

@@ -142,6 +142,13 @@ service cloud.firestore {
         return isAuthenticated() && resource.data.assignedToUid == request.auth.uid;
       }
       
+      // CRITICAL: Check if user is still a member of the team
+      // Users who left or were kicked cannot access/update assignments
+      function isStillTeamMember() {
+        return isAuthenticated() && 
+               request.auth.uid in getTeam().memberIds;
+      }
+      
       // Check if update only modifies allowed fields for members
       function isMemberAllowedUpdate() {
         // Members can only update status and photos
@@ -164,12 +171,20 @@ service cloud.firestore {
                        request.auth.uid == get(/databases/$(database)/documents/teams/$(request.resource.data.teamId)).data.ownerId;
       
       // Update: Team owner can update all, assigned members can only update specific fields
+      // CRITICAL: Members must still be in team to update (prevents orphaned task updates)
       allow update: if isTeamOwner() || 
-                       (isAssignedMember() && isMemberAllowedUpdate()) ||
-                       // Allow member to mark their own assignment as viewed
+                       (isAssignedMember() && isStillTeamMember() && isMemberAllowedUpdate()) ||
+                       // Allow member to mark their own assignment as viewed (if still in team)
                        (isAuthenticated() && 
                         resource.data.assignedToUid == request.auth.uid &&
+                        isStillTeamMember() &&
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedByMember'])) ||
+                       // Allow member to mark assignment as late+viewed (when leaving/kicked)
+                       (isAuthenticated() &&
+                        resource.data.assignedToUid == request.auth.uid &&
+                        isStillTeamMember() &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'viewedByMember']) &&
+                        request.resource.data.status == 'late') ||
                        // Allow owner to mark as viewed (for both viewedByOwner and viewedByMember)
                        (isAuthenticated() &&
                         isTeamOwner() &&
