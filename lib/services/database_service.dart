@@ -284,6 +284,30 @@ class DatabaseService {
       await _firestore.collection('users').doc(userId).update({
         'joinedTeamIds': FieldValue.arrayRemove([teamId]),
       });
+
+      // CRITICAL: Mark all incomplete assignments as viewed
+      // This prevents ghost badges for assignments from teams user has left
+      final assignmentsSnapshot = await _firestore
+          .collection('team_assignments')
+          .where('teamId', isEqualTo: teamId)
+          .where('assignedToUid', isEqualTo: userId)
+          .where('status', whereIn: ['pending', 'in_progress'])
+          .get();
+
+      if (assignmentsSnapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final assignmentDoc in assignmentsSnapshot.docs) {
+          batch.update(assignmentDoc.reference, {
+            'viewedByMember': true,
+            // Optionally mark as failed/cancelled
+            // 'status': 'cancelled',
+          });
+        }
+        await batch.commit();
+        print(
+          '✅ Marked ${assignmentsSnapshot.docs.length} assignments as viewed for user leaving team',
+        );
+      }
     } catch (e) {
       rethrow;
     }
@@ -342,15 +366,124 @@ class DatabaseService {
         // Continue with deletion even if Appwrite fails
       }
 
+      // CRITICAL: Delete all team assignments
+      // This prevents ghost badges for all members after team deletion
+      print('🗑️ Deleting all assignments for team: $teamId');
+      try {
+        final assignmentsSnapshot = await _firestore
+            .collection('team_assignments')
+            .where('teamId', isEqualTo: teamId)
+            .get();
+
+        if (assignmentsSnapshot.docs.isNotEmpty) {
+          print(
+            '📊 Found ${assignmentsSnapshot.docs.length} assignments to delete',
+          );
+          final batch = _firestore.batch();
+          for (final doc in assignmentsSnapshot.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+          print('✅ All team assignments deleted');
+        } else {
+          print('⚠️ No assignments found for this team');
+        }
+      } catch (e) {
+        print('⚠️ Failed to delete assignments (continuing): $e');
+        // Continue with team deletion even if assignment deletion fails
+      }
+
       // Remove from owner's joinedTeamIds
       await _firestore.collection('users').doc(userId).update({
         'joinedTeamIds': FieldValue.arrayRemove([teamId]),
       });
 
-      // Note: Ideally we should remove this teamId from ALL members' joinedTeamIds
-      // This might require a Cloud Function or batch operation if members are many.
-      // For now, we rely on the fact that accessing a deleted team will fail/be handled.
+      // CRITICAL: Remove teamId from ALL members' joinedTeamIds
+      // This prevents orphaned teamIds in user documents
+      if (team.memberIds.isNotEmpty) {
+        print(
+          '🧹 Cleaning up joinedTeamIds from ${team.memberIds.length} members',
+        );
+        final batch = _firestore.batch();
+
+        for (final memberId in team.memberIds) {
+          if (memberId != userId) {
+            // Skip owner, already handled above
+            final memberRef = _firestore.collection('users').doc(memberId);
+            batch.update(memberRef, {
+              'joinedTeamIds': FieldValue.arrayRemove([teamId]),
+            });
+          }
+        }
+
+        await batch.commit();
+        print('✅ Cleaned up joinedTeamIds from all members');
+      }
     } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// One-time cleanup: Remove orphaned teamIds from all users
+  /// Call this once to fix existing data corruption from before deleteTeam fix
+  Future<void> cleanupOrphanedTeamIds() async {
+    try {
+      print('🧹 Starting cleanup of orphaned teamIds...');
+
+      // Get all users
+      final usersSnapshot = await _firestore.collection('users').get();
+      final totalUsers = usersSnapshot.docs.length;
+      int usersFixed = 0;
+
+      for (final userDoc in usersSnapshot.docs) {
+        final joinedTeamIds = List<String>.from(
+          userDoc.data()['joinedTeamIds'] ?? [],
+        );
+
+        if (joinedTeamIds.isEmpty) continue;
+
+        final invalidTeamIds = <String>[];
+
+        // Check each teamId
+        for (final teamId in joinedTeamIds) {
+          final teamDoc = await _firestore
+              .collection('teams')
+              .doc(teamId)
+              .get();
+
+          if (!teamDoc.exists) {
+            // Team doesn't exist
+            invalidTeamIds.add(teamId);
+            print('   ❌ User ${userDoc.id}: Team $teamId not found');
+          } else {
+            // Team exists, check membership
+            final memberIds = List<String>.from(
+              teamDoc.data()?['memberIds'] ?? [],
+            );
+            if (!memberIds.contains(userDoc.id)) {
+              // User not in team's memberIds
+              invalidTeamIds.add(teamId);
+              print('   ❌ User ${userDoc.id}: Not in team $teamId memberIds');
+            }
+          }
+        }
+
+        // Remove invalid teamIds
+        if (invalidTeamIds.isNotEmpty) {
+          await userDoc.reference.update({
+            'joinedTeamIds': FieldValue.arrayRemove(invalidTeamIds),
+          });
+          usersFixed++;
+          print('   ✅ Fixed user ${userDoc.id}: Removed $invalidTeamIds');
+        }
+      }
+
+      print('');
+      print('✅ Cleanup complete!');
+      print('   Total users: $totalUsers');
+      print('   Users fixed: $usersFixed');
+    } catch (e) {
+      print('❌ Cleanup failed: $e');
       rethrow;
     }
   }
@@ -382,6 +515,26 @@ class DatabaseService {
       await _firestore.collection('users').doc(memberId).update({
         'joinedTeamIds': FieldValue.arrayRemove([teamId]),
       });
+
+      // CRITICAL: Mark all incomplete assignments as viewed
+      // This prevents ghost badges for kicked members
+      final assignmentsSnapshot = await _firestore
+          .collection('team_assignments')
+          .where('teamId', isEqualTo: teamId)
+          .where('assignedToUid', isEqualTo: memberId)
+          .where('status', whereIn: ['pending', 'in_progress'])
+          .get();
+
+      if (assignmentsSnapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final assignmentDoc in assignmentsSnapshot.docs) {
+          batch.update(assignmentDoc.reference, {'viewedByMember': true});
+        }
+        await batch.commit();
+        print(
+          '✅ Marked ${assignmentsSnapshot.docs.length} assignments as viewed for kicked member',
+        );
+      }
     } catch (e) {
       rethrow;
     }

@@ -166,14 +166,14 @@ service cloud.firestore {
       // Update: Team owner can update all, assigned members can only update specific fields
       allow update: if isTeamOwner() || 
                        (isAssignedMember() && isMemberAllowedUpdate()) ||
-                       // Allow member to mark as viewed
+                       // Allow member to mark their own assignment as viewed
                        (isAuthenticated() && 
                         resource.data.assignedToUid == request.auth.uid &&
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedByMember'])) ||
-                       // Allow owner to mark as viewed
+                       // Allow owner to mark as viewed (for both viewedByOwner and viewedByMember)
                        (isAuthenticated() &&
                         isTeamOwner() &&
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedByOwner']));
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedByOwner', 'viewedByMember']));
       
       // Delete: Allow team owner OR assigned member (for auto-cleanup)
       allow delete: if isTeamOwner() || isAssignedMember();

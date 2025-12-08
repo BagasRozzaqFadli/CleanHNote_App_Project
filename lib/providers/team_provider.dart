@@ -87,6 +87,18 @@ class TeamProvider with ChangeNotifier {
     }
   }
 
+  /// One-time cleanup: Remove orphaned teamIds from all users
+  /// Call this to fix existing data corruption where users have teamIds
+  /// for teams they are no longer part of
+  Future<void> cleanupOrphanedTeamIds() async {
+    try {
+      await _dbService.cleanupOrphanedTeamIds();
+      notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// Get team
   Future<TeamModel?> getTeam(String teamId) async {
     return await _dbService.getTeam(teamId);
