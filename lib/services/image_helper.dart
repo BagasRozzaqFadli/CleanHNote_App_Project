@@ -100,23 +100,44 @@ class ImageHelper {
     required String photoType, // 'before' or 'after'
   }) async {
     try {
+      print('📦 ImageHelper: Starting upload process...');
+      print('   File: ${file.path}');
+      print('   Task: $teamTaskId');
+      print('   Type: $photoType');
+
       // Compress image
+      print('📎 ImageHelper: Compressing image...');
       final base64Data = await compressAndConvert(file);
+
       if (base64Data == null) {
-        print('Failed to compress image');
+        print('❌ ImageHelper: Compression failed - base64Data is null');
         return null;
       }
 
+      final sizeKB = getBase64SizeKB(base64Data);
+      print('✅ ImageHelper: Compression successful');
+      print('   Size: ${sizeKB.toStringAsFixed(2)} KB');
+
       // Upload to Appwrite
+      print('📤 ImageHelper: Uploading to Appwrite...');
       final docId = await AppwriteService().storePhoto(
         teamTaskId: teamTaskId,
         photoType: photoType,
         base64Data: base64Data,
       );
 
+      if (docId != null) {
+        print('✅ ImageHelper: Upload complete with docId: $docId');
+      } else {
+        print('❌ ImageHelper: Upload returned null docId');
+      }
+
       return docId;
-    } catch (e) {
-      print('Error uploading photo to Appwrite: $e');
+    } catch (e, stackTrace) {
+      print('❌ ImageHelper: EXCEPTION during upload');
+      print('   Error: $e');
+      print('   Type: ${e.runtimeType}');
+      print('   StackTrace: $stackTrace');
       return null;
     }
   }

@@ -648,20 +648,37 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     );
     if (image == null) return;
     try {
+      print('📸 Uploading BEFORE photo for task: ${widget.assignment.id}');
+
       // Upload to Appwrite using ImageHelper
       final docId = await ImageHelper.uploadPhotoToAppwrite(
         file: File(image.path),
         teamTaskId: widget.assignment.id,
         photoType: 'before',
       );
+
       if (docId == null) {
+        print('❌ BEFORE photo upload failed - docId is null');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to upload photo to Appwrite')),
+            const SnackBar(
+              content: Text('Failed to upload photo to Appwrite'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;
       }
+
+      print('✅ BEFORE photo uploaded successfully with docId: $docId');
+
+      // Trigger UI rebuild to show the photo instantly
+      if (mounted) {
+        setState(() {
+          print('🔄 Rebuilding UI to display BEFORE photo');
+        });
+      }
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -671,10 +688,11 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
         );
       }
     } catch (e) {
+      print('❌ Error uploading BEFORE photo: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -688,20 +706,37 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     );
     if (image == null) return;
     try {
+      print('📸 Uploading AFTER photo for task: ${widget.assignment.id}');
+
       // Upload to Appwrite using ImageHelper
       final docId = await ImageHelper.uploadPhotoToAppwrite(
         file: File(image.path),
         teamTaskId: widget.assignment.id,
         photoType: 'after',
       );
+
       if (docId == null) {
+        print('❌ AFTER photo upload failed - docId is null');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to upload photo to Appwrite')),
+            const SnackBar(
+              content: Text('Failed to upload photo to Appwrite'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;
       }
+
+      print('✅ AFTER photo uploaded successfully with docId: $docId');
+
+      // Trigger UI rebuild to show the photo instantly
+      if (mounted) {
+        setState(() {
+          print('🔄 Rebuilding UI to display AFTER photo');
+        });
+      }
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -711,10 +746,11 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
         );
       }
     } catch (e) {
+      print('❌ Error uploading AFTER photo: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }

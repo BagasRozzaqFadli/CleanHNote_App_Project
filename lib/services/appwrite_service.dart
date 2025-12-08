@@ -124,7 +124,6 @@ class AppwriteService {
         documentId: documentId,
         data: {
           'base64Data': base64Data,
-          'updatedAt': DateTime.now().toIso8601String(),
           'sizeKB': (base64Data.length * 3 / 4) / 1024,
         },
         permissions: [

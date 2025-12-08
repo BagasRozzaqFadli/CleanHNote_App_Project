@@ -395,6 +395,7 @@ class TeamAnalyticsService {
 
   /// Get team analytics
   /// Auto-initializes if analytics document doesn't exist
+  /// IMPORTANT: Calculates incomplete tasks in REAL-TIME from Firestore
   Future<TeamAnalytics?> getTeamAnalytics(String teamId) async {
     try {
       await _ensureSession();
@@ -405,7 +406,107 @@ class TeamAnalyticsService {
         documentId: teamId,
       );
 
-      return TeamAnalytics.fromJson(doc.data);
+      var analytics = TeamAnalytics.fromJson(doc.data);
+
+      // CRITICAL: Calculate incomplete tasks in REAL-TIME from Firestore
+      // Incomplete = overdue + not done (status != 'done' && status != 'late')
+      print('📊 Calculating real-time incomplete tasks for team: $teamId');
+
+      try {
+        final now = DateTime.now();
+
+        // Get ALL assignments for this team
+        final assignmentsSnapshot = await FirebaseFirestore.instance
+            .collection('team_assignments')
+            .where('teamId', isEqualTo: teamId)
+            .get();
+
+        // Count incomplete tasks globally and per member
+        int totalIncomplete = 0;
+        final Map<String, int> memberIncompleteCount = {};
+
+        for (final assignmentDoc in assignmentsSnapshot.docs) {
+          final data = assignmentDoc.data();
+          final status = data['status'] ?? 'pending';
+          final memberId = data['assignedToUid'] ?? '';
+
+          // Skip completed and late tasks
+          if (status == 'done' || status == 'late') continue;
+
+          // Check if overdue
+          final dueDate = (data['dueDate'] as Timestamp?)?.toDate();
+          if (dueDate == null) continue; // No due date, skip
+
+          // Parse dueTime if exists
+          DateTime dueDateTime = dueDate;
+          if (data['dueTime'] != null) {
+            final timeparts = data['dueTime'].toString().split(':');
+            if (timeparts.length == 2) {
+              dueDateTime = DateTime(
+                dueDate.year,
+                dueDate.month,
+                dueDate.day,
+                int.parse(timeparts[0]),
+                int.parse(timeparts[1]),
+              );
+            }
+          }
+
+          // Check if overdue
+          if (now.isAfter(dueDateTime)) {
+            totalIncomplete++;
+            memberIncompleteCount[memberId] =
+                (memberIncompleteCount[memberId] ?? 0) + 1;
+            print(
+              '   Found incomplete: ${data['title']} (assigned to $memberId)',
+            );
+          }
+        }
+
+        print('✅ Found $totalIncomplete incomplete tasks');
+
+        // Update member stats with real-time incomplete counts
+        final updatedMembers = <String, MemberPerformance>{};
+        for (final entry in analytics.members.entries) {
+          final memberId = entry.key;
+          final member = entry.value;
+          final incompleteCount = memberIncompleteCount[memberId] ?? 0;
+
+          // Recalculate completion rate with incomplete included
+          final totalTasks = member.stats.assigned;
+          final completionRate = totalTasks > 0
+              ? (member.stats.completed / totalTasks) * 100
+              : 0.0;
+
+          updatedMembers[memberId] = MemberPerformance(
+            memberId: member.memberId,
+            name: member.name,
+            email: member.email,
+            joinedAt: member.joinedAt,
+            stats: MemberStats(
+              assigned: member.stats.assigned,
+              completed: member.stats.completed,
+              late: member.stats.late,
+              incomplete: incompleteCount, // Real-time value
+              avgCompletionHours: member.stats.avgCompletionHours,
+              completionRate: completionRate,
+              onTimeRate: member.stats.onTimeRate,
+            ),
+            recentTasks: member.recentTasks,
+          );
+        }
+
+        // Update analytics with real-time incomplete count
+        analytics = analytics.copyWith(
+          totalTasksIncomplete: totalIncomplete, // Real-time value
+          members: updatedMembers,
+        );
+      } catch (firestoreError) {
+        print('⚠️ Failed to calculate real-time incomplete: $firestoreError');
+        // Continue with stored analytics if Firestore fails
+      }
+
+      return analytics;
     } catch (e) {
       // Check if document doesn't exist (404 error)
       if (e.toString().contains('404') || e.toString().contains('not found')) {
@@ -455,13 +556,115 @@ class TeamAnalyticsService {
   }
 
   /// Get member performance
+  /// IMPORTANT: Adds incomplete tasks in REAL-TIME from Firestore
   Future<MemberPerformance?> getMemberPerformance(
     String teamId,
     String memberId,
   ) async {
     try {
       final analytics = await getTeamAnalytics(teamId);
-      return analytics?.members[memberId];
+      var member = analytics?.members[memberId];
+
+      if (member == null) return null;
+
+      // CRITICAL: Add incomplete tasks from Firestore to recentTasks
+      print('📊 Loading incomplete tasks for member: $memberId');
+
+      try {
+        final now = DateTime.now();
+
+        // Get ALL assignments for this member
+        final assignmentsSnapshot = await FirebaseFirestore.instance
+            .collection('team_assignments')
+            .where('teamId', isEqualTo: teamId)
+            .where('assignedToUid', isEqualTo: memberId)
+            .get();
+
+        final updatedTasks = List<TaskHistory>.from(member.recentTasks);
+
+        // Check each assignment for incomplete status
+        for (final assignmentDoc in assignmentsSnapshot.docs) {
+          final data = assignmentDoc.data();
+          final status = data['status'] ?? 'pending';
+
+          // Skip completed and late tasks
+          if (status == 'done' || status == 'late') continue;
+
+          // Check if overdue
+          final dueDate = (data['dueDate'] as Timestamp?)?.toDate();
+          if (dueDate == null) continue;
+
+          // Parse dueTime if exists
+          DateTime dueDateTime = dueDate;
+          if (data['dueTime'] != null) {
+            final timeparts = data['dueTime'].toString().split(':');
+            if (timeparts.length == 2) {
+              dueDateTime = DateTime(
+                dueDate.year,
+                dueDate.month,
+                dueDate.day,
+                int.parse(timeparts[0]),
+                int.parse(timeparts[1]),
+              );
+            }
+          }
+
+          // If overdue, check if already in recentTasks
+          if (now.isAfter(dueDateTime)) {
+            final taskId = assignmentDoc.id;
+            final existingIndex = updatedTasks.indexWhere(
+              (t) => t.taskId == taskId,
+            );
+
+            if (existingIndex != -1) {
+              // Update status to incomplete if exists
+              final existingTask = updatedTasks[existingIndex];
+              if (existingTask.status != 'incomplete') {
+                updatedTasks[existingIndex] = TaskHistory(
+                  taskId: existingTask.taskId,
+                  title: existingTask.title,
+                  description: existingTask.description,
+                  assignedAt: existingTask.assignedAt,
+                  dueAt: existingTask.dueAt,
+                  status: 'incomplete', // Update to incomplete
+                  completedAt: existingTask.completedAt,
+                  completionTimeHours: existingTask.completionTimeHours,
+                );
+              }
+            } else {
+              // Add as new incomplete task
+              updatedTasks.insert(
+                0,
+                TaskHistory(
+                  taskId: taskId,
+                  title: data['title'] ?? 'Untitled',
+                  description: data['description'] ?? '',
+                  assignedAt: (data['createdAt'] as Timestamp).toDate(),
+                  dueAt: dueDateTime,
+                  status: 'incomplete',
+                ),
+              );
+            }
+
+            print('   Added/Updated incomplete: ${data['title']}');
+          }
+        }
+
+        // Update member with new task list
+        member = MemberPerformance(
+          memberId: member.memberId,
+          name: member.name,
+          email: member.email,
+          joinedAt: member.joinedAt,
+          stats: member.stats,
+          recentTasks: updatedTasks,
+        );
+      } catch (firestoreError) {
+        print('⚠️ Failed to load incomplete tasks: $firestoreError');
+        // Continue with existing member data
+      }
+
+      return member;
     } catch (e) {
       print('❌ Failed to get member performance: $e');
       return null;
