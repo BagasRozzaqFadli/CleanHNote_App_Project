@@ -239,31 +239,44 @@ class PdfExportService {
   // Helper Methods
 
   static pw.Widget _buildStatsGrid(TeamAnalytics analytics) {
-    final completionRate = analytics.totalTasksAssigned > 0
-        ? (analytics.totalTasksCompleted / analytics.totalTasksAssigned * 100)
-        : 0.0;
-    final onTimeRate = analytics.totalTasksCompleted > 0
-        ? ((analytics.totalTasksCompleted - analytics.totalTasksLate) /
-              analytics.totalTasksCompleted *
-              100)
-        : 0.0;
-
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: PdfColors.grey300),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
       ),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+      child: pw.Column(
         children: [
-          _buildStatItem('Total Tasks', '${analytics.totalTasksAssigned}'),
-          _buildStatItem('Completed', '${analytics.totalTasksCompleted}'),
-          _buildStatItem(
-            'Completion Rate',
-            '${completionRate.toStringAsFixed(1)}%',
+          // Row 1: Total, Completed, Completion Rate, On-Time Rate
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem('Total Tasks', '${analytics.totalTasksAssigned}'),
+              _buildStatItem('Completed', '${analytics.totalTasksCompleted}'),
+              _buildStatItem(
+                'Completion Rate',
+                '${analytics.completionRate.toStringAsFixed(1)}%',
+              ),
+              _buildStatItem(
+                'On-Time Rate',
+                '${analytics.onTimeRate.toStringAsFixed(1)}%',
+              ),
+            ],
           ),
-          _buildStatItem('On-Time Rate', '${onTimeRate.toStringAsFixed(1)}%'),
+          pw.SizedBox(height: 16),
+          // Row 2: Late, Incomplete, Avg Time, Active Members
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem('Late', '${analytics.totalTasksLate}'),
+              _buildStatItem('Incomplete', '${analytics.totalTasksIncomplete}'),
+              _buildStatItem(
+                'Avg Completion',
+                '${(analytics.averageCompletionTimeHours / 24).toStringAsFixed(1)} days',
+              ),
+              _buildStatItem('Active Members', '${analytics.members.length}'),
+            ],
+          ),
         ],
       ),
     );
@@ -298,32 +311,36 @@ class PdfExportService {
           children: [
             _buildTableCell('Metric', isHeader: true),
             _buildTableCell('Value', isHeader: true),
+            _buildTableCell('Notes', isHeader: true),
           ],
         ),
         pw.TableRow(
           children: [
-            _buildTableCell('Average Completion Time'),
+            _buildTableCell('Task Breakdown'),
             _buildTableCell(
-              '${(analytics.averageCompletionTimeHours / 24).toStringAsFixed(1)} days',
+              'Completed: ${analytics.totalTasksCompleted} | Late: ${analytics.totalTasksLate} | Incomplete: ${analytics.totalTasksIncomplete}',
             ),
+            _buildTableCell('From ${analytics.totalTasksAssigned} total tasks'),
           ],
         ),
         pw.TableRow(
           children: [
-            _buildTableCell('Tasks Late'),
-            _buildTableCell('${analytics.totalTasksLate}'),
+            _buildTableCell('Performance Rates'),
+            _buildTableCell(
+              'Completion: ${analytics.completionRate.toStringAsFixed(1)}% | On-Time: ${analytics.onTimeRate.toStringAsFixed(1)}%',
+            ),
+            _buildTableCell('Higher is better'),
           ],
         ),
         pw.TableRow(
           children: [
-            _buildTableCell('Tasks Incomplete'),
-            _buildTableCell('${analytics.totalTasksIncomplete}'),
-          ],
-        ),
-        pw.TableRow(
-          children: [
-            _buildTableCell('Active Members'),
-            _buildTableCell('${analytics.members.length}'),
+            _buildTableCell('Team Insights'),
+            _buildTableCell(
+              '${analytics.members.length} active members | Avg: ${(analytics.averageCompletionTimeHours / 24).toStringAsFixed(1)} days',
+            ),
+            _buildTableCell(
+              'Last updated: ${_formatDate(analytics.lastUpdated)}',
+            ),
           ],
         ),
       ],
@@ -339,8 +356,10 @@ class PdfExportService {
       columnWidths: {
         0: const pw.FixedColumnWidth(40),
         1: const pw.FlexColumnWidth(3),
-        2: const pw.FlexColumnWidth(2),
-        3: const pw.FlexColumnWidth(1),
+        2: const pw.FlexColumnWidth(1.5),
+        3: const pw.FlexColumnWidth(1.5),
+        4: const pw.FlexColumnWidth(1.5),
+        5: const pw.FlexColumnWidth(2),
       },
       children: [
         pw.TableRow(
@@ -349,7 +368,9 @@ class PdfExportService {
             _buildTableCell('Rank', isHeader: true),
             _buildTableCell('Member', isHeader: true),
             _buildTableCell('Completed', isHeader: true),
-            _buildTableCell('Rate', isHeader: true),
+            _buildTableCell('Late', isHeader: true),
+            _buildTableCell('Incomplete', isHeader: true),
+            _buildTableCell('Completion %', isHeader: true),
           ],
         ),
         ...sortedMembers.take(10).map((member) {
@@ -359,6 +380,8 @@ class PdfExportService {
               _buildTableCell(rank <= 3 ? '🏆 $rank' : '$rank'),
               _buildTableCell(member.name),
               _buildTableCell('${member.stats.completed}'),
+              _buildTableCell('${member.stats.late}'),
+              _buildTableCell('${member.stats.incomplete}'),
               _buildTableCell(
                 '${member.stats.completionRate.toStringAsFixed(1)}%',
               ),

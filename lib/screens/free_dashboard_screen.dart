@@ -16,6 +16,7 @@ import '../widgets/local_time_widget.dart';
 import 'personal_task_detail_screen.dart';
 import '../providers/team_provider.dart';
 import '../widgets/task_limit_card.dart';
+import 'premium_upgrade_screen.dart';
 
 /// Free Plan Dashboard - Limited to 5 active tasks
 class FreeDashboardScreen extends StatefulWidget {
@@ -205,9 +206,10 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Contact admin to upgrade to Premium'),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PremiumUpgradeScreen(),
                       ),
                     );
                   },

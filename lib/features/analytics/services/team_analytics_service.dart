@@ -496,9 +496,11 @@ class TeamAnalyticsService {
           );
         }
 
-        // Update analytics with real-time incomplete count
+        // Update analytics with real-time values
         analytics = analytics.copyWith(
-          totalTasksIncomplete: totalIncomplete, // Real-time value
+          totalTasksAssigned:
+              assignmentsSnapshot.docs.length, // Real-time total
+          totalTasksIncomplete: totalIncomplete, // Real-time incomplete
           members: updatedMembers,
         );
       } catch (firestoreError) {
