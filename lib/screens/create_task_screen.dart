@@ -5,6 +5,7 @@ import '../providers/task_provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_history_service.dart';
 import '../widgets/task_time_picker.dart';
+import 'premium_upgrade_screen.dart';
 
 class CreateTaskScreen extends StatefulWidget {
   const CreateTaskScreen({super.key});
@@ -135,9 +136,12 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              // Navigate to upgrade screen or show info
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Contact Admin to upgrade!')),
+              // Navigate to premium upgrade screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PremiumUpgradeScreen(),
+                ),
               );
             },
             child: const Text('Upgrade'),
