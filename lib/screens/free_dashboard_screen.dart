@@ -17,6 +17,7 @@ import 'personal_task_detail_screen.dart';
 import '../providers/team_provider.dart';
 import '../widgets/task_limit_card.dart';
 import 'premium_upgrade_screen.dart';
+import 'about_us_screen.dart';
 
 /// Free Plan Dashboard - Limited to 5 active tasks
 class FreeDashboardScreen extends StatefulWidget {
@@ -445,6 +446,17 @@ class _FreeDashboardScreenState extends State<FreeDashboardScreen> {
             },
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.info),
+            title: const Text('About Us'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutUsScreen()),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),

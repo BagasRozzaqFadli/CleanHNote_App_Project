@@ -16,6 +16,7 @@ import '../widgets/local_time_widget.dart';
 import 'personal_task_detail_screen.dart';
 import '../providers/team_provider.dart';
 import '../widgets/task_limit_card.dart';
+import 'about_us_screen.dart';
 
 /// Premium Plan Dashboard - Unlimited tasks with team features
 class PremiumDashboardScreen extends StatefulWidget {
@@ -400,6 +401,17 @@ class _PremiumDashboardScreenState extends State<PremiumDashboardScreen> {
             },
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.info),
+            title: const Text('About Us'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutUsScreen()),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
