@@ -81,6 +81,7 @@ class LocalNotificationService {
       channelDescription: 'Reminders for upcoming tasks',
       importance: Importance.high,
       priority: Priority.high,
+      icon: 'ic_notification',
     );
 
     const iosDetails = DarwinNotificationDetails();
@@ -123,6 +124,7 @@ class LocalNotificationService {
       channelDescription: 'General app notifications',
       importance: Importance.high,
       priority: Priority.high,
+      icon: 'ic_notification',
     );
 
     const iosDetails = DarwinNotificationDetails();

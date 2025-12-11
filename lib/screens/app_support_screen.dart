@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// App Support Screen - Donation and Support for Developer
-class AppSupportScreen extends StatelessWidget {
+/// App Support Screen - Donation and Support for Developer with Language Toggle
+class AppSupportScreen extends StatefulWidget {
   const AppSupportScreen({super.key});
+
+  @override
+  State<AppSupportScreen> createState() => _AppSupportScreenState();
+}
+
+class _AppSupportScreenState extends State<AppSupportScreen> {
+  bool _isEnglish = true; // Default to English
 
   // Saweria donation link
   static const String _saweriaUrl = 'https://saweria.co/hironing';
@@ -15,8 +22,12 @@ class AppSupportScreen extends StatelessWidget {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open donation page. Please try again.'),
+            SnackBar(
+              content: Text(
+                _isEnglish
+                    ? 'Could not open donation page. Please try again.'
+                    : 'Tidak dapat membuka halaman donasi. Silakan coba lagi.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -38,9 +49,50 @@ class AppSupportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dukungan untuk Aplikasi'),
+        title: Text(_isEnglish ? 'App Support' : 'Dukungan untuk Aplikasi'),
         backgroundColor: Colors.pink[700],
         foregroundColor: Colors.white,
+        actions: [
+          // Language Toggle
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: [
+                Text(
+                  'ID',
+                  style: TextStyle(
+                    color: _isEnglish ? Colors.white60 : Colors.white,
+                    fontWeight: _isEnglish
+                        ? FontWeight.normal
+                        : FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Switch(
+                  value: _isEnglish,
+                  onChanged: (value) {
+                    setState(() {
+                      _isEnglish = value;
+                    });
+                  },
+                  activeTrackColor: Colors.amber.withOpacity(0.5),
+                  activeThumbColor: Colors.amber,
+                  inactiveThumbColor: Colors.white,
+                ),
+                Text(
+                  'EN',
+                  style: TextStyle(
+                    color: _isEnglish ? Colors.white : Colors.white60,
+                    fontWeight: _isEnglish
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -81,9 +133,9 @@ class AppSupportScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // Title
-              const Text(
-                'Dukung Pengembangan',
-                style: TextStyle(
+              Text(
+                _isEnglish ? 'Support Development' : 'Dukung Pengembangan',
+                style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: Colors.pink,
@@ -117,7 +169,9 @@ class AppSupportScreen extends StatelessWidget {
                     Icon(Icons.info_outline, size: 48, color: Colors.pink[400]),
                     const SizedBox(height: 16),
                     Text(
-                      'Terima kasih telah menggunakan CleanHNote!',
+                      _isEnglish
+                          ? 'Thank you for using CleanHNote!'
+                          : 'Terima kasih telah menggunakan CleanHNote!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
@@ -127,7 +181,9 @@ class AppSupportScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Dukungan Anda sangat berarti bagi Developer untuk terus mengembangkan dan meningkatkan fitur-fitur CleanHNote. Donasi Anda akan membantu dalam:',
+                      _isEnglish
+                          ? 'Your support means a lot to the Developer to continue developing and improving CleanHNote features. Your donations will help with:'
+                          : 'Dukungan Anda sangat berarti bagi Developer untuk terus mengembangkan dan meningkatkan fitur-fitur CleanHNote. Donasi Anda akan membantu dalam:',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -143,29 +199,43 @@ class AppSupportScreen extends StatelessWidget {
               // Benefits Cards
               _buildBenefitCard(
                 icon: Icons.build,
-                title: 'Pengembangan Fitur',
-                description: 'Menambahkan fitur-fitur baru yang lebih canggih',
+                title: _isEnglish
+                    ? 'Feature Development'
+                    : 'Pengembangan Fitur',
+                description: _isEnglish
+                    ? 'Adding more advanced new features'
+                    : 'Menambahkan fitur-fitur baru yang lebih canggih',
                 color: Colors.blue,
               ),
               const SizedBox(height: 12),
               _buildBenefitCard(
                 icon: Icons.speed,
-                title: 'Peningkatan Performa',
-                description: 'Optimasi aplikasi agar lebih cepat dan stabil',
+                title: _isEnglish
+                    ? 'Performance Improvement'
+                    : 'Peningkatan Performa',
+                description: _isEnglish
+                    ? 'Optimizing the app for faster and more stable performance'
+                    : 'Optimasi aplikasi agar lebih cepat dan stabil',
                 color: Colors.green,
               ),
               const SizedBox(height: 12),
               _buildBenefitCard(
                 icon: Icons.cloud_upload,
-                title: 'Infrastruktur Server',
-                description: 'Menjaga server dan database tetap optimal',
+                title: _isEnglish
+                    ? 'Server Infrastructure'
+                    : 'Infrastruktur Server',
+                description: _isEnglish
+                    ? 'Maintaining server and database for optimal performance'
+                    : 'Menjaga server dan database tetap optimal',
                 color: Colors.orange,
               ),
               const SizedBox(height: 12),
               _buildBenefitCard(
                 icon: Icons.support_agent,
-                title: 'Dukungan Pengguna',
-                description: 'Memberikan support dan maintenance berkelanjutan',
+                title: _isEnglish ? 'User Support' : 'Dukungan Pengguna',
+                description: _isEnglish
+                    ? 'Providing continuous support and maintenance'
+                    : 'Memberikan support dan maintenance berkelanjutan',
                 color: Colors.purple,
               ),
               const SizedBox(height: 32),
@@ -197,18 +267,18 @@ class AppSupportScreen extends StatelessWidget {
                         color: Colors.white,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Dukung Developer',
-                        style: TextStyle(
+                      Text(
+                        _isEnglish ? 'Support Developer' : 'Dukung Developer',
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Donasi Sekarang',
-                        style: TextStyle(
+                      Text(
+                        _isEnglish ? 'Donate Now' : 'Donasi Sekarang',
+                        style: const TextStyle(
                           fontSize: 18,
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -234,7 +304,9 @@ class AppSupportScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Buka Halaman Donasi',
+                              _isEnglish
+                                  ? 'Open Donation Page'
+                                  : 'Buka Halaman Donasi',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.pink[600],
@@ -251,10 +323,12 @@ class AppSupportScreen extends StatelessWidget {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text(
-                          'Setiap donasi, berapapun nominalnya, akan sangat membantu Developer dalam mengembangkan CleanHNote lebih baik lagi!',
+                        child: Text(
+                          _isEnglish
+                              ? 'Every donation, no matter the amount, will greatly help the Developer in making CleanHNote even better!'
+                              : 'Setiap donasi, berapapun nominalnya, akan sangat membantu Developer dalam mengembangkan CleanHNote lebih baik lagi!',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
                             color: Colors.white,
                             height: 1.5,
@@ -283,7 +357,7 @@ class AppSupportScreen extends StatelessWidget {
                         Icon(Icons.payment, color: Colors.pink[700], size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Metode Pembayaran',
+                          _isEnglish ? 'Payment Methods' : 'Metode Pembayaran',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -294,7 +368,9 @@ class AppSupportScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Mendukung berbagai metode pembayaran:\nQRIS • GoPay • OVO • DANA • LinkAja',
+                      _isEnglish
+                          ? 'Supports various payment methods:\nQRIS • GoPay • OVO • DANA • LinkAja'
+                          : 'Mendukung berbagai metode pembayaran:\nQRIS • GoPay • OVO • DANA • LinkAja',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -321,7 +397,9 @@ class AppSupportScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Setiap dukungan dari Anda sangat berharga dan memotivasi Developer untuk terus berinovasi!',
+                        _isEnglish
+                            ? 'Every bit of your support is valuable and motivates the Developer to keep innovating!'
+                            : 'Setiap dukungan dari Anda sangat berharga dan memotivasi Developer untuk terus berinovasi!',
                         style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                       ),
                     ),

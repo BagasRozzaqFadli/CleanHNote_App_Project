@@ -3,16 +3,64 @@ import 'terms_of_service_screen.dart';
 import 'app_support_screen.dart';
 
 /// About Us Landing Screen with navigation to ToS and Support
-class AboutUsScreen extends StatelessWidget {
+class AboutUsScreen extends StatefulWidget {
   const AboutUsScreen({super.key});
+
+  @override
+  State<AboutUsScreen> createState() => _AboutUsScreenState();
+}
+
+class _AboutUsScreenState extends State<AboutUsScreen> {
+  bool _isEnglish = true; // Default to English
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('About Us'),
+        title: Text(_isEnglish ? 'About Us' : 'Tentang Kami'),
         backgroundColor: Colors.indigo[700],
         foregroundColor: Colors.white,
+        actions: [
+          // Language Toggle
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: [
+                Text(
+                  'ID',
+                  style: TextStyle(
+                    color: _isEnglish ? Colors.white60 : Colors.white,
+                    fontWeight: _isEnglish
+                        ? FontWeight.normal
+                        : FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Switch(
+                  value: _isEnglish,
+                  onChanged: (value) {
+                    setState(() {
+                      _isEnglish = value;
+                    });
+                  },
+                  activeTrackColor: Colors.amber.withOpacity(0.5),
+                  activeThumbColor: Colors.amber,
+                  inactiveThumbColor: Colors.white,
+                ),
+                Text(
+                  'EN',
+                  style: TextStyle(
+                    color: _isEnglish ? Colors.white : Colors.white60,
+                    fontWeight: _isEnglish
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -65,7 +113,9 @@ class AboutUsScreen extends StatelessWidget {
 
               // Tagline
               Text(
-                'Aplikasi Manajemen Tugas & Kolaborasi Tim',
+                _isEnglish
+                    ? 'Task Management & Team Collaboration App'
+                    : 'Aplikasi Manajemen Tugas & Kolaborasi Tim',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
@@ -91,7 +141,9 @@ class AboutUsScreen extends StatelessWidget {
                   ],
                 ),
                 child: Text(
-                  'CleanHNote adalah solusi produktivitas modern yang membantu Anda mengorganisir tugas pribadi dan berkolaborasi dengan tim. Dengan fitur-fitur lengkap seperti manajemen tugas tanpa batas (Premium), sistem tim dengan QR code, verifikasi foto tugas, dan analitik real-time, CleanHNote dirancang untuk meningkatkan efisiensi dan produktivitas Anda.',
+                  _isEnglish
+                      ? 'CleanHNote is a modern productivity solution that helps you organize personal tasks and collaborate with teams. With comprehensive features like unlimited task management (Premium), QR code team system, task photo verification, and real-time analytics, CleanHNote is designed to boost your efficiency and productivity.'
+                      : 'CleanHNote adalah solusi produktivitas modern yang membantu Anda mengorganisir tugas pribadi dan berkolaborasi dengan tim. Dengan fitur-fitur lengkap seperti manajemen tugas tanpa batas (Premium), sistem tim dengan QR code, verifikasi foto tugas, dan analitik real-time, CleanHNote dirancang untuk meningkatkan efisiensi dan produktivitas Anda.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -107,7 +159,9 @@ class AboutUsScreen extends StatelessWidget {
                 context,
                 icon: Icons.description,
                 title: 'Terms of Services',
-                description: 'Baca ketentuan layanan lengkap untuk CleanHNote',
+                description: _isEnglish
+                    ? 'Read complete terms of service for CleanHNote'
+                    : 'Baca ketentuan layanan lengkap untuk CleanHNote',
                 color: Colors.blue,
                 onTap: () {
                   Navigator.push(
@@ -122,8 +176,12 @@ class AboutUsScreen extends StatelessWidget {
               _buildNavigationCard(
                 context,
                 icon: Icons.favorite,
-                title: 'Dukungan untuk Aplikasi',
-                description: 'Dukung pengembangan aplikasi CleanHNote',
+                title: _isEnglish
+                    ? 'Support the App'
+                    : 'Dukungan untuk Aplikasi',
+                description: _isEnglish
+                    ? 'Support CleanHNote development'
+                    : 'Dukung pengembangan aplikasi CleanHNote',
                 color: Colors.pink,
                 onTap: () {
                   Navigator.push(
@@ -138,7 +196,7 @@ class AboutUsScreen extends StatelessWidget {
 
               // Footer
               Text(
-                '© 2025 CleanHNote\nAll rights reserved',
+                '© 2025 CleanHNote\n${_isEnglish ? "All rights reserved" : "Hak cipta dilindungi"}',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey[500]),
               ),
