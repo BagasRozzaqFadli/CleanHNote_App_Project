@@ -98,6 +98,16 @@ class UserModel {
   /// Check if user is in any team
   bool get isInTeam => joinedTeamIds.isNotEmpty;
 
+  /// Check if user's personal tasks exceed free plan limit (5)
+  bool exceedsFreeTaskLimit(int currentTaskCount) {
+    return !isPremium && currentTaskCount > 5;
+  }
+
+  /// Check if user's joined teams exceed free plan limit (3)
+  bool exceedsFreeTeamLimit(int currentJoinedCount) {
+    return !isPremium && currentJoinedCount > 3;
+  }
+
   /// Create a copy with updated fields
   UserModel copyWith({
     String? uid,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/database_service.dart';
@@ -18,6 +19,7 @@ import 'services/notification_scheduler.dart';
 import 'services/notification_checker.dart';
 import 'services/notification_background_worker.dart';
 import 'services/appwrite_service.dart';
+import 'services/premium_downgrade_service.dart';
 import 'package:workmanager/workmanager.dart';
 
 void main() async {
@@ -99,8 +101,40 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _hasCheckedDowngrade = false;
+
+  Future<void> _checkPremiumDowngrade(String uid) async {
+    if (_hasCheckedDowngrade) return;
+    _hasCheckedDowngrade = true;
+
+    try {
+      final downgradeService = PremiumDowngradeService();
+      final wasDowngraded = await downgradeService.checkAndApplyDowngrade(uid);
+
+      if (wasDowngraded && mounted) {
+        // Show notification to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '⚠️ Your premium has expired. Features are now limited to Free plan.',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error checking premium downgrade: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,9 +149,12 @@ class AuthWrapper extends StatelessWidget {
       return const LoginScreen();
     }
 
-    // Fetch user data from Firestore to determine role
-    return FutureBuilder<UserModel?>(
-      future: context.read<DatabaseService>().getUser(firebaseUser.uid),
+    // Listen to user data changes in real-time for automatic dashboard switching
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -125,7 +162,7 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasError || !snapshot.hasData) {
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
           return Scaffold(
             body: Center(
               child: Column(
@@ -144,10 +181,13 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        final user = snapshot.data!;
+        final user = UserModel.fromFirestore(snapshot.data!);
         AppLogger.log('User role: ${user.role}', tag: 'AuthWrapper');
 
-        // Route based on role
+        // Check for premium downgrade on app startup
+        _checkPremiumDowngrade(firebaseUser.uid);
+
+        // Route based on role (will automatically update when role changes)
         switch (user.role) {
           case 'admin':
             return const AdminDashboardScreen();

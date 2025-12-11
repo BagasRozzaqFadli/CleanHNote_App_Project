@@ -9,6 +9,7 @@ class TeamModel {
   final String inviteCode; // Unique code for joining
   final List<String> memberIds; // UIDs of team members
   final DateTime createdAt;
+  final bool isHiddenDueToExpiry; // True if owner's premium expired
 
   TeamModel({
     required this.id,
@@ -17,6 +18,7 @@ class TeamModel {
     required this.inviteCode,
     required this.memberIds,
     required this.createdAt,
+    this.isHiddenDueToExpiry = false,
   });
 
   /// Convert from Firestore document
@@ -29,6 +31,7 @@ class TeamModel {
       inviteCode: data['inviteCode'] ?? '',
       memberIds: List<String>.from(data['memberIds'] ?? []),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isHiddenDueToExpiry: data['isHiddenDueToExpiry'] ?? false,
     );
   }
 
@@ -40,6 +43,7 @@ class TeamModel {
       'inviteCode': inviteCode,
       'memberIds': memberIds,
       'createdAt': Timestamp.fromDate(createdAt),
+      'isHiddenDueToExpiry': isHiddenDueToExpiry,
     };
   }
 
@@ -70,6 +74,7 @@ class TeamModel {
     String? inviteCode,
     List<String>? memberIds,
     DateTime? createdAt,
+    bool? isHiddenDueToExpiry,
   }) {
     return TeamModel(
       id: id ?? this.id,
@@ -78,6 +83,7 @@ class TeamModel {
       inviteCode: inviteCode ?? this.inviteCode,
       memberIds: memberIds ?? this.memberIds,
       createdAt: createdAt ?? this.createdAt,
+      isHiddenDueToExpiry: isHiddenDueToExpiry ?? this.isHiddenDueToExpiry,
     );
   }
 }

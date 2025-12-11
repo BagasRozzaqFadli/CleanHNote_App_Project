@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../models/user_model.dart';
 import '../models/team_model.dart';
 import '../providers/team_provider.dart';
+import '../widgets/premium_expiry_countdown.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -400,6 +401,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         ),
                                       ),
                                     ),
+                                  ),
+
+                                  // Premium Expiry Countdown
+                                  PremiumExpiryCountdown(
+                                    user: userModel,
+                                    onExpired: () {
+                                      // Refresh the screen to show free plan
+                                      setState(() {});
+                                    },
                                   ),
                                 ],
                               );

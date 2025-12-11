@@ -52,6 +52,7 @@ service cloud.firestore {
       // Allow username updates
       // ALSO allow team owner to update joinedTeamIds (for kicking members)
       // ADMIN: Allow admin to update role, isBanned, premiumExpiresAt
+      // MOCK PAYMENT TESTING: Allow user to update their own premium fields
       allow update: if (isAdmin() && 
                        request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['role', 'isBanned', 'premiumExpiresAt'])) ||
@@ -67,7 +68,20 @@ service cloud.firestore {
                         // OR allow if a team owner is removing this user from joinedTeamIds (kicking)
                         (isAuthenticated() &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedTeamIds']) &&
-                         request.resource.data.joinedTeamIds.size() == resource.data.joinedTeamIds.size() - 1);
+                         request.resource.data.joinedTeamIds.size() == resource.data.joinedTeamIds.size() - 1) ||
+                        // MOCK PAYMENT: Allow user to update premium fields for testing
+                        (isOwner(userId) &&
+                         request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['role', 'premiumExpiresAt', 'mockPurchaseDate', 'mockPackageName', 'mockDurationMonths']) &&
+                         // Only allow upgrading to premium, not to admin
+                         request.resource.data.role in ['free', 'premium']) ||
+                         // AUTO-DOWNGRADE: Allow user to downgrade self if premium expired
+                         (isOwner(userId) &&
+                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']) &&
+                          request.resource.data.role == 'free' &&
+                          resource.data.role == 'premium' &&
+                          resource.data.premiumExpiresAt != null &&
+                          resource.data.premiumExpiresAt < request.time);
       
       // Delete: Allow if user owns document
       

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../services/in_app_purchase_service.dart';
 
-/// Premium Upgrade Screen - Vertical List Layout
+/// Premium Upgrade Screen - Ready for In-App Purchase
 class PremiumUpgradeScreen extends StatefulWidget {
   const PremiumUpgradeScreen({super.key});
 
@@ -13,6 +14,8 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  final InAppPurchaseService _iapService = InAppPurchaseService();
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -26,6 +29,114 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
       curve: Curves.easeInOut,
     );
     _animationController.forward();
+
+    // Initialize IAP service
+    _initializeIAP();
+  }
+
+  Future<void> _initializeIAP() async {
+    await _iapService.initialize();
+
+    // Setup callbacks
+    _iapService.onPurchaseSuccess = (success) {
+      if (success && mounted) {
+        _showSuccessDialog();
+      }
+    };
+
+    _iapService.onPurchaseError = (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        setState(() => _isProcessing = false);
+      }
+    };
+
+    _iapService.onPurchasePending = (isPending) {
+      if (mounted) {
+        setState(() => _isProcessing = isPending);
+      }
+    };
+  }
+
+  Future<void> _handlePurchase(String productId) async {
+    if (_isProcessing) return;
+
+    setState(() => _isProcessing = true);
+
+    // Attempt purchase
+    await _iapService.purchaseProduct(productId);
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                size: 50,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              '🎉 Premium Activated!',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You now have full access to all Premium features!',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context, true); // Return to dashboard
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFBBF24),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
+                ),
+              ),
+              child: const Text(
+                'Get Started',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -52,10 +163,10 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF1E1B4B), // Dark indigo
-              Color(0xFF312E81), // Indigo
-              Color(0xFF4C1D95), // Purple
-              Color(0xFF5B21B6), // Purple
+              Color(0xFF1E1B4B),
+              Color(0xFF312E81),
+              Color(0xFF4C1D95),
+              Color(0xFF5B21B6),
             ],
           ),
         ),
@@ -71,6 +182,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
                 const SizedBox(height: 32),
                 _buildPricingSection(),
                 const SizedBox(height: 20),
+                _buildInfoNote(),
               ],
             ),
           ),
@@ -82,7 +194,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
   Widget _buildHeader() {
     return Column(
       children: [
-        // Premium Icon
         TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.0, end: 1.0),
           duration: const Duration(milliseconds: 800),
@@ -254,7 +365,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
               ],
             ),
           ),
-          Icon(Icons.check_circle, color: const Color(0xFF10B981), size: 24),
+          const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 24),
         ],
       ),
     );
@@ -287,6 +398,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
           duration: '1 Month',
           price: 'Rp 29.000',
           monthly: 'Rp 29.000/month',
+          productId: InAppPurchaseService.kProduct1Month,
           isPopular: false,
         ),
         const SizedBox(height: 12),
@@ -294,6 +406,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
           duration: '3 Months',
           price: 'Rp 79.000',
           monthly: 'Rp 26.333/month',
+          productId: InAppPurchaseService.kProduct3Months,
           isPopular: true,
           savings: 'Save 9%',
         ),
@@ -302,6 +415,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
           duration: '12 Months',
           price: 'Rp 290.000',
           monthly: 'Rp 24.166/month',
+          productId: InAppPurchaseService.kProduct12Months,
           isPopular: false,
           savings: 'Save 17%',
         ),
@@ -313,176 +427,187 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     required String duration,
     required String price,
     required String monthly,
+    required String productId,
     required bool isPopular,
     String? savings,
   }) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isPopular
+        InkWell(
+          onTap: _isProcessing ? null : () => _handlePurchase(productId),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isPopular
+                    ? [
+                        Colors.white.withValues(alpha: 0.2),
+                        Colors.white.withValues(alpha: 0.15),
+                      ]
+                    : [
+                        Colors.white.withValues(alpha: 0.12),
+                        Colors.white.withValues(alpha: 0.08),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isPopular
+                    ? const Color(0xFFFBBF24)
+                    : Colors.white.withValues(alpha: 0.2),
+                width: isPopular ? 2 : 1,
+              ),
+              boxShadow: isPopular
                   ? [
-                      Colors.white.withValues(alpha: 0.2),
-                      Colors.white.withValues(alpha: 0.15),
+                      BoxShadow(
+                        color: const Color(0xFFFBBF24).withValues(alpha: 0.25),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
                     ]
-                  : [
-                      Colors.white.withValues(alpha: 0.12),
-                      Colors.white.withValues(alpha: 0.08),
-                    ],
+                  : null,
             ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isPopular
-                  ? const Color(0xFFFBBF24)
-                  : Colors.white.withValues(alpha: 0.2),
-              width: isPopular ? 2 : 1,
-            ),
-            boxShadow: isPopular
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFFFBBF24).withValues(alpha: 0.25),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                duration,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              duration,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              monthly,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            price,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          if (savings != null)
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                savings,
                                 style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
                                   color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF10B981),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Full premium access for $duration',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Purchase Button
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFBBF24).withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: _isProcessing
+                        ? const Center(
+                            child: SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.shopping_cart,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
                               Text(
-                                monthly,
+                                'SELECT PLAN',
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white.withValues(alpha: 0.75),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              price,
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                            if (savings != null)
-                              Container(
-                                margin: const EdgeInsets.only(top: 4),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  savings,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.check_circle_outline,
-                          color: const Color(0xFF10B981),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Full premium access for $duration',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Coming Soon Overlay
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
-                        ),
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF8B5CF6,
-                            ).withValues(alpha: 0.5),
-                            blurRadius: 16,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: const Text(
-                        'COMING SOON',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         if (isPopular)
@@ -529,6 +654,46 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildInfoNote() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.5), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Colors.blue, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Payment System Ready',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'System siap menerima pembayaran. Tinggal setup Google Play Console untuk aktivasi.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

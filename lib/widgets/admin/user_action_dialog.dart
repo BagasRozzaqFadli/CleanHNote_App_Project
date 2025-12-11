@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_model.dart';
 import '../../services/database_service.dart';
 import 'premium_package_dialog.dart';
@@ -186,6 +187,71 @@ class UserActionDialog extends StatelessWidget {
                     ),
                   ),
                 ),
+
+              const SizedBox(height: 12),
+
+              // 2-Minute Test Premium Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final confirmed = await _showConfirmDialog(
+                      context,
+                      title: '2-Minute Test Premium?',
+                      message:
+                          'Grant ${user.username} premium access for 2 minutes?\n\nThis is for testing the countdown and auto-downgrade features.',
+                    );
+
+                    if (confirmed == true && context.mounted) {
+                      try {
+                        final expiryTime = DateTime.now().add(
+                          const Duration(minutes: 2),
+                        );
+
+                        // Directly update Firestore with custom expiry time
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .update({
+                              'role': 'premium',
+                              'premiumExpiresAt': Timestamp.fromDate(
+                                expiryTime,
+                              ),
+                            });
+
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '✅ ${user.username} granted 2-min test premium\nExpires at: ${expiryTime.hour}:${expiryTime.minute.toString().padLeft(2, '0')}',
+                              ),
+                              backgroundColor: Colors.purple,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.timer),
+                  label: const Text('2-Min Test Premium'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 12),
 

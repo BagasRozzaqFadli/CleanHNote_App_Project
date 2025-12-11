@@ -6,6 +6,8 @@ import '../models/team_assignment_model.dart';
 import 'notification_history_service.dart';
 import 'notification_scheduler.dart';
 import 'appwrite_service.dart';
+import 'premium_downgrade_service.dart';
+import 'premium_expiry_notifier.dart';
 import '../features/analytics/services/team_analytics_service.dart';
 
 /// Result of auto-maintenance operation
@@ -142,7 +144,13 @@ class DatabaseService {
       final userDoc = await _firestore.collection('users').doc(ownerId).get();
       final user = UserModel.fromFirestore(userDoc);
 
-      if (!user.isPremium) {
+      // Validate premium access (auto-downgrades if expired)
+      final downgradeService = PremiumDowngradeService();
+      final hasValidPremium = await downgradeService.validatePremiumAccess(
+        ownerId,
+      );
+
+      if (!hasValidPremium) {
         throw Exception('Only Premium users can create teams');
       }
 
@@ -605,6 +613,10 @@ class DatabaseService {
     return _firestore
         .collection('teams')
         .where('memberIds', arrayContains: uid)
+        .where(
+          'isHiddenDueToExpiry',
+          isEqualTo: false,
+        ) // Filter out hidden teams
         .snapshots()
         .map(
           (snapshot) =>
@@ -873,6 +885,9 @@ class DatabaseService {
       // Check and downgrade expired premium users
       await checkExpiredPremium();
 
+      // Check and send premium expiry warnings
+      await _checkPremiumExpiryWarnings(uid);
+
       return MaintenanceResult(
         deletedTasks: deletedCount,
         prunedImages: prunedCount,
@@ -1022,17 +1037,29 @@ class DatabaseService {
 
       print('🔄 Found ${expiredUsersQuery.docs.length} expired premium users');
 
-      final batch = _firestore.batch();
+      // Use downgrade service for each expired user
+      final downgradeService = PremiumDowngradeService();
       for (var doc in expiredUsersQuery.docs) {
-        batch.update(doc.reference, {'role': 'free'});
+        await downgradeService.checkAndApplyDowngrade(doc.id);
       }
 
-      await batch.commit();
-      print(
-        '✅ Downgraded ${expiredUsersQuery.docs.length} expired premium users',
-      );
+      print('✅ Processed ${expiredUsersQuery.docs.length} expired users');
     } catch (e) {
       print('❌ Error checking expired premium: $e');
+    }
+  }
+
+  /// Restore hidden teams when user upgrades to premium
+  Future<void> restoreTeamsOnUpgrade(String uid) async {
+    await PremiumDowngradeService().restoreOwnedTeams(uid);
+  }
+
+  /// Check and send premium expiry warnings
+  Future<void> _checkPremiumExpiryWarnings(String uid) async {
+    try {
+      await PremiumExpiryNotifier().checkAndNotifyExpiry(uid);
+    } catch (e) {
+      print('❌ Error checking premium expiry warnings: $e');
     }
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import '../models/task_model.dart';
 import '../services/database_service.dart';
+import '../services/premium_downgrade_service.dart';
+import '../services/premium_expiry_notifier.dart';
 
 /// Provider for personal task management with auto-maintenance
 class TaskProvider with ChangeNotifier {
@@ -9,8 +11,8 @@ class TaskProvider with ChangeNotifier {
   bool _isInitialized = false;
   DateTime? _lastMaintenanceTime;
 
-  // Run maintenance once per day (24 hours)
-  static const _maintenanceInterval = Duration(hours: 24);
+  // Run maintenance once per hour (reduced from 24 hours for premium expiry)
+  static const _maintenanceInterval = Duration(hours: 1);
 
   MaintenanceResult? get maintenanceResult => _maintenanceResult;
   bool get isInitialized => _isInitialized;
@@ -32,6 +34,16 @@ class TaskProvider with ChangeNotifier {
 
     try {
       print('🧹 Running auto-maintenance (last run: $_lastMaintenanceTime)...');
+
+      // Check for premium downgrade first
+      final downgradeService = PremiumDowngradeService();
+      await downgradeService.checkAndApplyDowngrade(uid);
+
+      // Check for premium expiry warnings
+      final expiryNotifier = PremiumExpiryNotifier();
+      await expiryNotifier.checkAndNotifyExpiry(uid);
+
+      // Run regular maintenance
       _maintenanceResult = await _dbService.runAutoMaintenance(uid);
       _lastMaintenanceTime = now;
       print('✅ Maintenance result: $_maintenanceResult');
