@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'database_service.dart';
 
 /// In-App Purchase Service for Premium Upgrade
@@ -14,6 +15,12 @@ class InAppPurchaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // In-App Purchase instance and state
+  final InAppPurchase _iap = InAppPurchase.instance;
+  StreamSubscription<List<PurchaseDetails>>? _subscription;
+  List<ProductDetails> _products = [];
+  bool _isAvailable = false;
+
   // Product IDs - MUST match Google Play Console products
   static const String kProduct1Month = 'cleanhnote_premium_1m';
   static const String kProduct3Months = 'cleanhnote_premium_3m';
@@ -25,48 +32,161 @@ class InAppPurchaseService {
   Function(bool)? onPurchasePending;
 
   /// Initialize IAP system
-  /// TODO: Add in_app_purchase package initialization when ready
   Future<void> initialize() async {
-    print('📦 IAP Service initialized (waiting for Google Console setup)');
+    print('📦 Initializing IAP Service...');
 
-    // TODO: When Google Console is ready:
-    // 1. Install packages:
-    //    - in_app_purchase: ^3.2.0
-    //    - in_app_purchase_android: ^0.3.0+24
-    // 2. Initialize InAppPurchase instance
-    // 3. Setup purchase stream listener
-    // 4. Load products from Google Play
+    // Check if IAP is available on this device
+    _isAvailable = await _iap.isAvailable();
+
+    if (!_isAvailable) {
+      print('❌ IAP not available on this device');
+      return;
+    }
+
+    print('✅ IAP is available');
+
+    // Setup purchase listener
+    _subscription = _iap.purchaseStream.listen(
+      _onPurchaseUpdate,
+      onDone: () {
+        print('🔚 Purchase stream closed');
+        _subscription?.cancel();
+      },
+      onError: (error) {
+        print('❌ Purchase stream error: $error');
+        onPurchaseError?.call('Purchase error: $error');
+      },
+    );
+
+    // Load products from Google Play
+    await _loadProducts();
+  }
+
+  /// Load products from Google Play
+  Future<void> _loadProducts() async {
+    try {
+      final Set<String> productIds = {
+        kProduct1Month,
+        kProduct3Months,
+        kProduct12Months,
+      };
+
+      final ProductDetailsResponse response = await _iap.queryProductDetails(
+        productIds,
+      );
+
+      if (response.notFoundIDs.isNotEmpty) {
+        print('⚠️ Products not found: ${response.notFoundIDs}');
+      }
+
+      if (response.error != null) {
+        print('❌ Error loading products: ${response.error}');
+        return;
+      }
+
+      _products = response.productDetails;
+      print('✅ Loaded ${_products.length} products');
+
+      for (var product in _products) {
+        print('  - ${product.id}: ${product.price}');
+      }
+    } catch (e) {
+      print('❌ Exception loading products: $e');
+    }
   }
 
   /// Check if IAP is available
-  bool get isAvailable {
-    // TODO: Return actual availability when package is installed
-    return false; // Not yet available
-  }
+  bool get isAvailable => _isAvailable;
 
   /// Get product details by ID
-  /// TODO: Return ProductDetails from Google Play
-  dynamic getProduct(String productId) {
-    print('🔍 Product requested: $productId');
-    // TODO: When ready, return actual ProductDetails
-    return null;
+  ProductDetails? getProduct(String productId) {
+    try {
+      return _products.firstWhere((p) => p.id == productId);
+    } catch (e) {
+      return null;
+    }
   }
 
   /// Purchase a product
-  /// TODO: Trigger actual Google Play purchase flow
   Future<void> purchaseProduct(String productId) async {
-    print('🛒 Purchase requested for: $productId');
+    if (!_isAvailable) {
+      onPurchaseError?.call('In-App Purchase tidak tersedia di perangkat ini');
+      return;
+    }
 
-    // For now, show message that Google Console is needed
-    onPurchaseError?.call(
-      'Payment system not yet configured. '
-      'Google Play Console setup required.',
-    );
+    if (_products.isEmpty) {
+      onPurchaseError?.call('Produk belum dimuat. Silakan coba lagi.');
+      await _loadProducts();
+      return;
+    }
 
-    // TODO: When Google Console ready:
-    // 1. Get ProductDetails from productId
-    // 2. Create PurchaseParam
-    // 3. Call InAppPurchase.buyNonConsumable()
+    try {
+      final product = _products.firstWhere(
+        (p) => p.id == productId,
+        orElse: () => throw Exception('Product not found: $productId'),
+      );
+
+      print('� Starting purchase for: ${product.title}');
+
+      final PurchaseParam purchaseParam = PurchaseParam(
+        productDetails: product,
+      );
+
+      // Start purchase flow
+      final bool success = await _iap.buyNonConsumable(
+        purchaseParam: purchaseParam,
+      );
+
+      if (!success) {
+        onPurchaseError?.call('Gagal memulai proses pembayaran');
+      } else {
+        print('✅ Purchase flow started');
+        onPurchasePending?.call(true);
+      }
+    } catch (e) {
+      print('❌ Purchase error: $e');
+      onPurchaseError?.call('Error: $e');
+    }
+  }
+
+  /// Handle purchase updates from the stream
+  void _onPurchaseUpdate(List<PurchaseDetails> purchaseDetailsList) {
+    for (final PurchaseDetails purchaseDetails in purchaseDetailsList) {
+      print('� Purchase update: ${purchaseDetails.status}');
+
+      switch (purchaseDetails.status) {
+        case PurchaseStatus.pending:
+          print('⏳ Purchase pending...');
+          onPurchasePending?.call(true);
+          break;
+
+        case PurchaseStatus.purchased:
+        case PurchaseStatus.restored:
+          print('✅ Purchase successful!');
+          _grantPremiumAccess(
+            productId: purchaseDetails.productID,
+            purchaseId: purchaseDetails.purchaseID ?? '',
+          );
+          break;
+
+        case PurchaseStatus.error:
+          print('❌ Purchase error: ${purchaseDetails.error}');
+          onPurchaseError?.call(
+            purchaseDetails.error?.message ?? 'Purchase failed',
+          );
+          break;
+
+        case PurchaseStatus.canceled:
+          print('🚫 Purchase canceled by user');
+          onPurchaseError?.call('Pembayaran dibatalkan');
+          break;
+      }
+
+      // Complete the purchase
+      if (purchaseDetails.pendingCompletePurchase) {
+        _iap.completePurchase(purchaseDetails);
+      }
+    }
   }
 
   /// Process successful purchase and grant premium
@@ -121,22 +241,25 @@ class InAppPurchaseService {
   }
 
   /// Restore previous purchases
-  /// TODO: Implement when Google Play is configured
   Future<void> restorePurchases() async {
-    print('🔄 Restore purchases requested');
+    if (!_isAvailable) {
+      onPurchaseError?.call('In-App Purchase tidak tersedia');
+      return;
+    }
 
-    onPurchaseError?.call(
-      'Restore not yet available. '
-      'Google Play Console setup required.',
-    );
-
-    // TODO: When ready:
-    // await InAppPurchase.instance.restorePurchases();
+    try {
+      print('🔄 Restoring purchases...');
+      await _iap.restorePurchases();
+      print('✅ Restore request sent');
+    } catch (e) {
+      print('❌ Restore error: $e');
+      onPurchaseError?.call('Gagal memulihkan pembelian: $e');
+    }
   }
 
   /// Dispose resources
   void dispose() {
-    // TODO: Cancel purchase stream subscription when implemented
+    _subscription?.cancel();
     print('🔚 IAP Service disposed');
   }
 
