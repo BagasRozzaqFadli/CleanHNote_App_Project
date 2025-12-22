@@ -14,7 +14,6 @@ class UserManagementScreen extends StatefulWidget {
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _isSearching = false;
 
   @override
   void dispose() {
@@ -29,79 +28,57 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         title: const Text('User Management'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            onPressed: () {
-              setState(() {
-                _isSearching = !_isSearching;
-                if (!_isSearching) {
-                  _searchController.clear();
-                  _searchQuery = '';
-                }
-              });
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // Search Bar
-          if (_isSearching)
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.grey[100],
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by Tenant ID (e.g., ABC123)',
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
+          // Search Bar (Always Visible)
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey[100],
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by name, email, or ID...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value.toUpperCase().trim();
-                  });
-                },
-                textCapitalization: TextCapitalization.characters,
-                maxLength: 6,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
               ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.trim().toLowerCase();
+                });
+              },
             ),
+          ),
 
           // User List
-          Expanded(
-            child: _searchQuery.isEmpty
-                ? _buildAllUsersList()
-                : _buildSearchResults(),
-          ),
+          Expanded(child: _buildUsersList()),
         ],
       ),
     );
   }
 
-  /// Build list of all users
-  Widget _buildAllUsersList() {
+  /// Build list of users with optional filtering
+  Widget _buildUsersList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
           .orderBy('createdAt', descending: true)
-          .limit(50) // Limit to 50 users per page
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -121,51 +98,33 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           );
         }
 
-        final users = snapshot.data?.docs ?? [];
+        final allUsers = snapshot.data?.docs ?? [];
 
-        if (users.isEmpty) {
+        if (allUsers.isEmpty) {
           return const Center(child: Text('No users found'));
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: users.length,
-          itemBuilder: (context, index) {
-            final userDoc = users[index];
-            final user = UserModel.fromFirestore(userDoc);
-            return _buildUserCard(user);
-          },
-        );
-      },
-    );
-  }
+        // Convert to UserModel and filter based on search query
+        final users = allUsers.map((doc) => UserModel.fromFirestore(doc)).where((
+          user,
+        ) {
+          if (_searchQuery.isEmpty) return true;
 
-  /// Build search results for specific tenant ID
-  Widget _buildSearchResults() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .where('tenantId', isEqualTo: _searchQuery)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+          // Search in username, email, and tenant ID (case-insensitive, partial match)
+          final searchLower = _searchQuery.toLowerCase();
+          return user.username.toLowerCase().contains(searchLower) ||
+              user.email.toLowerCase().contains(searchLower) ||
+              user.tenantId.toLowerCase().contains(searchLower);
+        }).toList();
 
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-
-        final users = snapshot.data?.docs ?? [];
-
-        if (users.isEmpty) {
+        if (users.isEmpty && _searchQuery.isNotEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.search_off, size: 64, color: Colors.grey),
                 const SizedBox(height: 16),
-                Text('No user found with Tenant ID: $_searchQuery'),
+                Text('No users found matching: "$_searchQuery"'),
               ],
             ),
           );
@@ -175,8 +134,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           padding: const EdgeInsets.all(16),
           itemCount: users.length,
           itemBuilder: (context, index) {
-            final userDoc = users[index];
-            final user = UserModel.fromFirestore(userDoc);
+            final user = users[index];
             return _buildUserCard(user);
           },
         );

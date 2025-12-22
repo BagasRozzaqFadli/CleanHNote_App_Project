@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import 'user_management_screen.dart';
 
-/// Admin Dashboard - Main hub for administrative functions
+/// Admin Dashboard - Simple and clean admin panel
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
 
@@ -12,224 +12,180 @@ class AdminDashboardScreen extends StatelessWidget {
     final user = context.watch<AuthService>().currentUser;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1A237E), // Deep Indigo
-              Color(0xFF283593), // Indigo
-              Color(0xFF5E35B1), // Deep Purple
-              Color(0xFF7B1FA2), // Purple
-            ],
-          ),
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5B67CA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.admin_panel_settings,
+                color: Color(0xFF5B67CA),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Admin Panel',
+              style: TextStyle(
+                color: Color(0xFF2D3648),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Color(0xFF5B67CA)),
+            onPressed: () => context.read<AuthService>().signOut(),
+            tooltip: 'Logout',
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Admin Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF5B67CA), Color(0xFF8B5CF6)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF5B67CA).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Admin Panel',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              user?.email ?? '',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white70,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
+                  const Icon(
+                    Icons.verified_user,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      user?.email ?? 'Administrator',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.logout, color: Colors.white),
-                        onPressed: () {
-                          context.read<AuthService>().signOut();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.admin_panel_settings,
-                          size: 16,
-                          color: Colors.black87,
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Administrator',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Dashboard Cards
-                  _buildDashboardCard(
-                    context,
-                    title: 'User Management',
-                    subtitle: 'Manage all users',
-                    icon: Icons.people,
-                    color: Colors.blue,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const UserManagementScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDashboardCard(
-                    context,
-                    title: 'Statistics',
-                    subtitle: 'View analytics',
-                    icon: Icons.bar_chart,
-                    color: Colors.green,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Coming soon!')),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDashboardCard(
-                    context,
-                    title: 'Reports',
-                    subtitle: 'Generate reports',
-                    icon: Icons.assessment,
-                    color: Colors.orange,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Coming soon!')),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDashboardCard(
-                    context,
-                    title: 'Settings',
-                    subtitle: 'System config',
-                    icon: Icons.settings,
-                    color: Colors.purple,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Coming soon!')),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
+            const SizedBox(height: 32),
 
-  Widget _buildDashboardCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [color.withOpacity(0.8), color.withOpacity(0.6)],
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 32, color: Colors.white),
+            // Welcome Message
+            const Text(
+              'Welcome to Admin Panel',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D3648),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Manage your application users from here',
+              style: TextStyle(fontSize: 14, color: Color(0xFF8A94A6)),
+            ),
+            const SizedBox(height: 32),
+
+            // User Management Card
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const UserManagementScreen(),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5B67CA), Color(0xFF8B5CF6)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.people_rounded,
                         color: Colors.white,
+                        size: 32,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white70,
+                    const SizedBox(width: 20),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'User Management',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2D3648),
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'View, search, and manage all users',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF8A94A6),
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Color(0xFF8A94A6),
+                      size: 20,
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.white70,
-                size: 20,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
