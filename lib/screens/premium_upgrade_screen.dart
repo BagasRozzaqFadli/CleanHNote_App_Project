@@ -182,7 +182,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
                 const SizedBox(height: 32),
                 _buildPricingSection(),
                 const SizedBox(height: 20),
-                _buildInfoNote(),
               ],
             ),
           ),
@@ -654,46 +653,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildInfoNote() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.5), width: 1),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: Colors.blue, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Payment System Ready',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'System siap menerima pembayaran. Tinggal setup Google Play Console untuk aktivasi.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

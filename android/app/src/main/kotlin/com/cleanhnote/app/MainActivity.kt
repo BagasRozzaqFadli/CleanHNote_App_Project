@@ -1,4 +1,4 @@
-package com.example.cleanhnote
+package com.cleanhnote.app
 
 import io.flutter.embedding.android.FlutterActivity
 

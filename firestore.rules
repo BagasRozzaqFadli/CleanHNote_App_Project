@@ -69,12 +69,11 @@ service cloud.firestore {
                         (isAuthenticated() &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedTeamIds']) &&
                          request.resource.data.joinedTeamIds.size() == resource.data.joinedTeamIds.size() - 1) ||
-                         // MOCK PAYMENT & IAP: Allow user to update premium fields
+                         // REAL IAP: Allow user to update premium fields after purchase
                          (isOwner(userId) &&
                           request.resource.data.diff(resource.data).affectedKeys()
                            .hasOnly(['role', 'premiumExpiresAt', 'purchaseId', 'productId', 
-                                    'purchaseDate', 'mockPurchaseDate', 'mockPackageName', 
-                                    'mockDurationMonths']) &&
+                                    'purchaseDate']) &&
                           // Only allow upgrading to premium, not to admin
                           request.resource.data.role in ['free', 'premium']) ||
                          // AUTO-DOWNGRADE: Allow user to downgrade self if premium expired
