@@ -91,19 +91,19 @@ class AppwriteService {
 
       return document.$id;
     } catch (e) {
-      // If document exists, update it instead
-      if (e.toString().contains(
-        'Document with the requested ID already exists',
-      )) {
+      // If ANY error during create (likely document exists), try update instead
+      print('⚠️ Create failed, attempting update: $e');
+
+      try {
         return await updatePhoto(
           teamTaskId: teamTaskId,
           photoType: photoType,
           base64Data: base64Data,
         );
+      } catch (updateError) {
+        print('❌ Error updating photo in Appwrite: $updateError');
+        return null;
       }
-
-      print('Error storing photo in Appwrite: $e');
-      return null;
     }
   }
 

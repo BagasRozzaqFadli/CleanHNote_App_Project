@@ -16,7 +16,7 @@ import '../widgets/full_screen_image_viewer.dart';
 import 'edit_team_task_screen.dart';
 
 /// Detail screen for team assignments with full operations
-/// Photos are now stored in Appwrite Documents
+/// Photos are now stored in cloud storage
 class TeamTaskDetailScreen extends StatefulWidget {
   final TeamAssignmentModel assignment;
   const TeamTaskDetailScreen({super.key, required this.assignment});
@@ -639,7 +639,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     );
   }
 
-  /// Upload BEFORE photo to Appwrite Documents
+  /// Upload BEFORE photo to cloud storage
   Future<void> _uploadBeforePhoto(BuildContext context) async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(
@@ -650,7 +650,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     try {
       print('📸 Uploading BEFORE photo for task: ${widget.assignment.id}');
 
-      // Upload to Appwrite using ImageHelper
+      // Upload to cloud storage using ImageHelper
       final docId = await ImageHelper.uploadPhotoToAppwrite(
         file: File(image.path),
         teamTaskId: widget.assignment.id,
@@ -682,7 +682,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✓ Before photo uploaded to Appwrite!'),
+            content: Text('✓ Before photo uploaded!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -697,7 +697,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     }
   }
 
-  /// Upload AFTER photo to Appwrite Documents
+  /// Upload AFTER photo to cloud storage
   Future<void> _uploadAfterPhoto(BuildContext context) async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(
@@ -708,7 +708,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     try {
       print('📸 Uploading AFTER photo for task: ${widget.assignment.id}');
 
-      // Upload to Appwrite using ImageHelper
+      // Upload to cloud storage using ImageHelper
       final docId = await ImageHelper.uploadPhotoToAppwrite(
         file: File(image.path),
         teamTaskId: widget.assignment.id,
@@ -740,7 +740,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✓ After photo uploaded to Appwrite!'),
+            content: Text('✓ After photo uploaded!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -755,7 +755,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
     }
   }
 
-  /// Build proof photos section (retrieves from Appwrite, falls back to Firestore)
+  /// Build proof photos section (retrieves from cloud storage, falls back to Firestore)
   Widget _buildProofPhotosSection(BuildContext context, String currentUserId) {
     final isAssignedMember = widget.assignment.assignedToUid == currentUserId;
 
@@ -781,7 +781,7 @@ class _TeamTaskDetailScreenState extends State<TeamTaskDetailScreen> {
         return FutureBuilder<Map<String, String?>>(
           future: AppwriteService().getBothPhotos(widget.assignment.id),
           builder: (context, snapshot) {
-            // Get photos from Appwrite or fallback to Firestore
+            // Get photos from cloud storage or fallback to Firestore
             final beforePhotoBase64 =
                 snapshot.hasData && snapshot.data!['before'] != null
                 ? snapshot.data!['before']

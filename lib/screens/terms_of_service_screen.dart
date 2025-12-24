@@ -182,7 +182,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
         'CleanHNote is a task management and productivity application designed to help users organize, track, and complete personal and team tasks effectively and efficiently.',
         'The Application provides various features including but not limited to: creating and managing personal tasks with priority and difficulty level systems, setting task due dates and times, automatic notification and reminder systems, marking tasks as complete or incomplete, and automatic deletion of completed tasks after a certain period (7 days).',
         'For Premium users, the Application offers team collaboration features including: creating and managing work teams, inviting team members via unique QR codes, assigning tasks to specific team members, task completion verification system with photo proof upload (before and after), real-time team and member performance analytics, exporting analytical reports in PDF format, and unlimited access for task creation.',
-        'The Application uses trusted cloud infrastructure for data storage, including Firebase Firestore for structured data and Appwrite for image storage, to ensure availability, security, and data synchronization across devices.',
+        'The Application uses trusted cloud infrastructure for data storage, including Firebase Firestore for structured data and secure cloud storage for image storage, to ensure availability, security, and data synchronization across devices.',
       ]),
 
       // 3. User Accounts
@@ -241,7 +241,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
       // 8. Data Management
       _buildSection('8. Data Management and Storage', [
         'CleanHNote uses Firebase Firestore as the main database to store structured data such as user information, personal tasks, team tasks, team information, and notifications. All data is synchronized in real-time to cloud servers.',
-        'For photo storage (Premium feature), the Application uses Appwrite as a cloud storage service. Uploaded photos will be automatically compressed to optimize storage space usage and access speed without significantly reducing visual quality.',
+        'For photo storage (Premium feature), the Application uses a secure cloud storage service. Uploaded photos will be automatically compressed to optimize storage space usage and access speed without significantly reducing visual quality.',
         'Automatic Deletion Policy: (a) Personal tasks marked as completed will be automatically deleted after 7 days, (b) Team tasks (assignments) that have been completed will be automatically deleted after 7 days, (c) Team tasks that pass the deadline (late) will be automatically deleted 7 days after the deadline, (d) Notifications that have been read will be automatically deleted after 7 days.',
         'Automatic deletion is intended to keep the database optimal and prevent accumulation of data that is no longer relevant. Users are advised to save copies of important data before the automatic deletion period.',
         'The developer implements reasonable security measures to protect user data, including data encryption in transit and token-based authentication. However, no system is 100% secure, and users understand this risk.',
@@ -325,7 +325,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
         'CleanHNote adalah aplikasi manajemen tugas (task management) dan produktivitas yang dirancang untuk membantu pengguna dalam mengorganisir, melacak, dan menyelesaikan tugas-tugas pribadi maupun tugas tim secara efektif dan efisien.',
         'Aplikasi menyediakan berbagai fitur termasuk namun tidak terbatas pada: pembuatan dan pengelolaan tugas pribadi dengan sistem prioritas dan level kesulitan, pengaturan tanggal dan waktu jatuh tempo tugas, sistem notifikasi dan pengingat otomatis, penandaan tugas sebagai selesai atau belum selesai, dan penghapusan otomatis tugas yang telah selesai setelah periode waktu tertentu (7 hari).',
         'Untuk pengguna Premium, Aplikasi menawarkan fitur-fitur kolaborasi tim yang meliputi: pembuatan dan pengelolaan tim kerja, undangan anggota tim melalui kode QR unik, penugasan tugas kepada anggota tim tertentu, sistem verifikasi penyelesaian tugas dengan unggahan foto bukti (before dan after), analitik kinerja tim dan anggota tim secara real-time, ekspor laporan analitik dalam format PDF, dan akses tanpa batas untuk pembuatan tugas.',
-        'Aplikasi menggunakan infrastruktur cloud terpercaya untuk penyimpanan data, termasuk Firebase Firestore untuk data terstruktur dan Appwrite untuk penyimpanan gambar, guna memastikan ketersediaan, keamanan, dan sinkronisasi data di berbagai perangkat.',
+        'Aplikasi menggunakan infrastruktur cloud terpercaya untuk penyimpanan data, termasuk Firebase Firestore untuk data terstruktur dan layanan cloud storage aman untuk penyimpanan gambar, guna memastikan ketersediaan, keamanan, dan sinkronisasi data di berbagai perangkat.',
       ]),
 
       // 3. User Accounts
@@ -384,7 +384,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
       // 8. Data Management
       _buildSection('8. Manajemen dan Penyimpanan Data', [
         'CleanHNote menggunakan Firebase Firestore sebagai database utama untuk menyimpan data terstruktur seperti informasi pengguna, tugas pribadi, tugas tim, informasi tim, dan notifikasi. Semua data disinkronkan secara real-time ke cloud server.',
-        'Untuk penyimpanan foto (fitur Premium), Aplikasi menggunakan Appwrite sebagai layanan cloud storage. Foto yang diunggah akan dikompres secara otomatis untuk mengoptimalkan penggunaan ruang penyimpanan dan kecepatan akses tanpa mengurangi kualitas visual secara signifikan.',
+        'Untuk penyimpanan foto (fitur Premium), Aplikasi menggunakan layanan cloud storage aman. Foto yang diunggah akan dikompres secara otomatis untuk mengoptimalkan penggunaan ruang penyimpanan dan kecepatan akses tanpa mengurangi kualitas visual secara signifikan.',
         'Kebijakan Penghapusan Otomatis: (a) Tugas pribadi yang telah ditandai selesai akan dihapus otomatis setelah 7 hari, (b) Tugas tim (assignments) yang telah selesai akan dihapus otomatis setelah 7 hari, (c) Tugas tim yang melewati deadline (late/tertinggal) akan dihapus otomatis setelah 7 hari sejak deadline, (d) Notifikasi yang sudah dibaca akan dihapus otomatis setelah 7 hari.',
         'Penghapusan otomatis dimaksudkan untuk menjaga database tetap optimal dan mencegah akumulasi data yang tidak lagi relevan. Pengguna disarankan untuk menyimpan salinan data penting sebelum periode penghapusan otomatis.',
         'Pengembang menerapkan langkah-langkah keamanan yang wajar untuk melindungi data pengguna, termasuk enkripsi data saat transit dan autentikasi berbasis token. Namun, tidak ada sistem yang 100% aman, dan pengguna memahami risiko ini.',

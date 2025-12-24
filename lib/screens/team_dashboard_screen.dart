@@ -746,7 +746,7 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
                         isSubmitting = true;
                       });
                       try {
-                        // Upload photos to Appwrite Documents
+                        // Upload photos to cloud storage
                         final beforeDocId =
                             await ImageHelper.uploadPhotoToAppwrite(
                               file: beforeImage!,
@@ -761,12 +761,10 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
                             );
 
                         if (beforeDocId == null || afterDocId == null) {
-                          throw Exception(
-                            'Failed to upload photos to Appwrite',
-                          );
+                          throw Exception('Failed to upload photos');
                         }
 
-                        // Mark task as complete (photos already in Appwrite)
+                        // Mark task as complete (photos already in cloud)
                         final user = context.read<AuthService>().currentUser;
                         await context.read<TeamProvider>().submitProof(
                           task.id,
