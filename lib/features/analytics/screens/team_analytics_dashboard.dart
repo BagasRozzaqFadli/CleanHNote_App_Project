@@ -361,6 +361,10 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
   }
 
   Widget _buildOverviewCards() {
+    // Check if we have any completed tasks for meaningful metrics
+    final hasCompletedTasks = _analytics!.totalTasksCompleted > 0;
+    final hasCompletionTime = _analytics!.averageCompletionTimeHours > 0;
+
     return Column(
       children: [
         // Row 1: Completion Rate & On-Time Rate
@@ -369,18 +373,22 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
             Expanded(
               child: _buildStatCard(
                 'Completion Rate',
-                '${_analytics!.completionRate.toStringAsFixed(1)}%',
+                hasCompletedTasks
+                    ? '${_analytics!.completionRate.toStringAsFixed(1)}%'
+                    : 'N/A',
                 Icons.check_circle_outline,
-                Colors.green,
+                hasCompletedTasks ? Colors.green : Colors.grey,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
                 'On-Time Rate',
-                '${_analytics!.onTimeRate.toStringAsFixed(1)}%',
+                hasCompletedTasks
+                    ? '${_analytics!.onTimeRate.toStringAsFixed(1)}%'
+                    : 'N/A',
                 Icons.access_time,
-                Colors.blue,
+                hasCompletedTasks ? Colors.blue : Colors.grey,
               ),
             ),
           ],
@@ -392,9 +400,13 @@ class _TeamAnalyticsDashboardState extends State<TeamAnalyticsDashboard> {
             Expanded(
               child: _buildStatCard(
                 'Avg Completion',
-                '${(_analytics!.averageCompletionTimeHours / 24).toStringAsFixed(1)}d',
+                hasCompletedTasks && hasCompletionTime
+                    ? '${(_analytics!.averageCompletionTimeHours / 24).toStringAsFixed(1)}d'
+                    : 'N/A',
                 Icons.speed,
-                Colors.orange,
+                hasCompletedTasks && hasCompletionTime
+                    ? Colors.orange
+                    : Colors.grey,
               ),
             ),
             const SizedBox(width: 12),

@@ -57,6 +57,13 @@ class NotificationHistoryService {
           final validNotifications = snapshot.docs
               .map((doc) => NotificationHistoryModel.fromFirestore(doc))
               .where((notif) {
+                // Always count assignment notifications (instant)
+                if (notif.notificationType == 'assigned') {
+                  print('  📋 ${notif.taskTitle} (assigned): ALWAYS COUNT');
+                  return true;
+                }
+
+                // Count reminders only if scheduled time has passed
                 final isPast = notif.scheduledFor.isBefore(now);
                 print('  📋 ${notif.taskTitle} (${notif.notificationType}):');
                 print('     scheduledFor: ${notif.scheduledFor}');
@@ -87,7 +94,14 @@ class NotificationHistoryService {
 
     return snapshot.docs
         .map((doc) => NotificationHistoryModel.fromFirestore(doc))
-        .where((notif) => notif.scheduledFor.isBefore(now))
+        .where((notif) {
+          // Always include assignment notifications
+          if (notif.notificationType == 'assigned') {
+            return true;
+          }
+          // Include reminders only if scheduled time passed
+          return notif.scheduledFor.isBefore(now);
+        })
         .toList();
   }
 

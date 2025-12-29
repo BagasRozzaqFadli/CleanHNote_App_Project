@@ -109,6 +109,16 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
         print('✅ Immediate assignment notification created');
       } catch (e) {
         print('⚠️ Failed to create assignment notification: $e');
+        // Show error to user for debugging
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Warning: Notification creation failed: $e'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
 
       // Create notification history entries if date and time are set
@@ -523,9 +533,9 @@ class _CreateTeamTaskScreenState extends State<CreateTeamTaskScreen> {
 
                           if (searchQuery.isNotEmpty) {
                             members = members.where((m) {
-                              return m.username
-                                      .toLowerCase()
-                                      .contains(searchQuery) ||
+                              return m.username.toLowerCase().contains(
+                                    searchQuery,
+                                  ) ||
                                   m.email.toLowerCase().contains(searchQuery);
                             }).toList();
                           }

@@ -233,9 +233,15 @@ class NotificationScheduler {
 
   /// Cancel all notifications for a task
   static Future<void> cancelTaskReminders(String taskId) async {
-    for (var i = 0; i < 6; i++) {
-      final notificationId = _generateNotificationId(taskId, i);
-      await _notifications.cancel(notificationId);
+    try {
+      for (var i = 0; i < 6; i++) {
+        final notificationId = _generateNotificationId(taskId, i);
+        await _notifications.cancel(notificationId);
+      }
+    } catch (e) {
+      // Silently fail - notifications will auto-clear anyway
+      // This prevents crashes from flutter_local_notifications plugin issues
+      print('⚠️ Could not cancel notifications for task $taskId: $e');
     }
   }
 

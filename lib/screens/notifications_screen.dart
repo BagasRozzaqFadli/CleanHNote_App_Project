@@ -97,10 +97,38 @@ class NotificationsScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Filter notifications: only show if scheduled time has passed
-          final notifications = (snapshot.data ?? [])
-              .where((notif) => notif.scheduledFor.isBefore(DateTime.now()))
-              .toList();
+          // DEBUG: Log raw data from Firestore
+          print(
+            '🔍 [NotificationsScreen] Raw data count: ${snapshot.data?.length ?? 0}',
+          );
+          if (snapshot.data != null) {
+            for (var notif in snapshot.data!) {
+              print('  📋 ${notif.notificationType}: ${notif.taskTitle}');
+              print('     scheduledFor: ${notif.scheduledFor}');
+              print('     now: ${DateTime.now()}');
+            }
+          }
+
+          // Filter notifications:
+          // 1. Show "assigned" notifications immediately (even if just created)
+          // 2. Show reminder notifications only after scheduled time has passed
+          final notifications = (snapshot.data ?? []).where((notif) {
+            // Always show assignment notifications
+            if (notif.notificationType == 'assigned') {
+              print('  ✅ Including assigned: ${notif.taskTitle}');
+              return true;
+            }
+            // Show other notifications only if scheduled time has passed
+            final shouldShow = notif.scheduledFor.isBefore(DateTime.now());
+            print(
+              '  ${shouldShow ? "✅" : "❌"} ${notif.notificationType}: ${notif.taskTitle} (shouldShow: $shouldShow)',
+            );
+            return shouldShow;
+          }).toList();
+
+          print(
+            '🎯 [NotificationsScreen] Filtered count: ${notifications.length}',
+          );
 
           if (notifications.isEmpty) {
             return Center(
